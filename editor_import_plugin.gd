@@ -23,7 +23,7 @@ extends EditorImportPlugin
 
 
 func _get_importer_name() -> String:
-	return "ivoyager.table_importer"
+	return "ivoyager.tables"
 
 
 func _get_visible_name() -> String:

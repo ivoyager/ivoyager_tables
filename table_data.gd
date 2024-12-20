@@ -44,7 +44,7 @@ extends Node
 ##   [row_enum][col_enum]. Swap row & column if table has @TRANSPOSE directive.[br][br]
 ##
 ## See plugin
-## [url=https://github.com/ivoyager/ivoyager_table_importer/blob/master/README.md]README[/url]
+## [url=https://github.com/ivoyager/ivoyager_tables/blob/master/README.md]README[/url]
 ## for details.
 
 
@@ -85,7 +85,7 @@ var precisions := {}
 ## correct for the column or container element (with STRING and STRING_NAME being
 ## mutually compatable). E.g., "inf" is the float INF in a FLOAT column but
 ## is simply "inf" in a STRING column. User can add, replace or disable values by
-## supplying [param add_overwrite_table_constants] in [method postprocess_tables] (use null to
+## supplying [param merge_overwrite_table_constants] in [method postprocess_tables] (use null to
 ## disable an existing value).
 var table_constants := {
 	&"x" : true,
@@ -130,6 +130,8 @@ var missing_values := {
 ## postprocessing for [IVTableModding].
 var table_postprocessor := IVTablePostprocessor.new()
 
+## Placeholder method. Will assert an error if any table file has units and user
+## did not supply [param unit_conversion_method].
 static var placeholder_unit_conversion_method := func(_x: float, _unit: StringName,
 		 _to_internal: bool, _parse_compound_unit: bool) -> float:
 	assert(false, "Unit in table but no unit_conversion_method specified in postprocess_tables()")
@@ -141,27 +143,26 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 ## Call this function once to populate dictionaries with postprocessed table
 ## data. All data containers will be set to read-only.[br][br]
 ##
+## If float units are used in any table file you MUST specify
+## [param unit_conversion_method]. If using I, Voyager's 'Units' plugin, the
+## Callable to supply is IVQConvert.convert_quantity.[br][br]
+##
 ## To use enum constants in table file INT columns, include the enums in
 ## [param project_enums].[br][br]
 ##
 ## To add arbitrary constants in table file columns of any type, include key: value
-## pairs in [param add_overwrite_table_constants]. The constants will be applied
+## pairs in [param merge_overwrite_table_constants]. The constants will be applied
 ## only if the constant type matches the column type. Use this also to overwrite
 ## or disable existing constants in [member table_constants] (use null to disable).[br][br]
 ##
 ## To replace default 'missing' type values, supply replacements in
-## [param overwrite_missing_values]. See notes and cautions in [member missing_values].[br][br]
-##
-## WIP (after plugin split):[br]
-## If float units are used in any table file you MUST either a) have the 'ivoyager_units'
-## plugin enabled or b) supply your own [param unit_conversion_method]. By default,
-## the function will attempt to get this method from the plugin.
-func postprocess_tables(table_file_paths: Array, project_enums := [], enable_wiki := false,
-		enable_precisions := false, add_overwrite_table_constants := {},
-		overwrite_missing_values := {},
-		unit_conversion_method := placeholder_unit_conversion_method) -> void:
+## [param overwrite_missing_values]. See notes and cautions in [member missing_values].
+func postprocess_tables(table_file_paths: Array,
+		unit_conversion_method := placeholder_unit_conversion_method,
+		enable_wiki := false, enable_precisions := false, project_enums := [],
+		merge_overwrite_table_constants := {}, overwrite_missing_values := {}) -> void:
 	
-	table_constants.merge(add_overwrite_table_constants, true)
+	table_constants.merge(merge_overwrite_table_constants, true)
 	missing_values.merge(overwrite_missing_values, true)
 	assert(missing_values[TYPE_ARRAY] == [], "Don't change missing array value!") # hard-coding!
 	var missing_float: float = missing_values[TYPE_FLOAT]
@@ -171,10 +172,10 @@ func postprocess_tables(table_file_paths: Array, project_enums := [], enable_wik
 	var project_enums_: Array[Dictionary] = Array(project_enums, TYPE_DICTIONARY, &"", null)
 	if is_same(unit_conversion_method, placeholder_unit_conversion_method):
 		# TODO: Make conditional after 'Tables' and 'Units' plugin split...
-		#if IVTableImporterPluginUtils.is_plugin_enabled("ivoyager_units"):
-		#	var ivqconvert: Script = load("res://addons/ivoyager_units/ivqconvert.gd")
-		#	unit_conversion_method = ivqconvert.convert_quantity
-		unit_conversion_method = IVQConvert.convert_quantity
+		if IVTablesPluginUtils.is_plugin_enabled("ivoyager_units"):
+			var ivqconvert: Script = load("res://addons/ivoyager_units/qconvert.gd")
+			@warning_ignore("unsafe_property_access")
+			unit_conversion_method = ivqconvert.get(&"convert_quantity")
 	
 	table_postprocessor.postprocess(table_file_paths_, project_enums_, tables, enumerations,
 			enumeration_dicts, enumeration_arrays, table_n_rows, entity_prefixes, wiki_lookup,
