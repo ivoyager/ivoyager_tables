@@ -1,6 +1,6 @@
 # I, Voyager - Tables
 
-TL;DR: This Godot Editor plugin imports tables like [this](https://github.com/ivoyager/ivoyager/blob/master/data/solar_system/planets.tsv) and provides access to processed, statically typed data. It can impute defaults, convert floats by specified units, prefix text, convert text enumerations to integers, and more! 
+TL;DR: This Godot Editor plugin imports tables like [this](https://github.com/ivoyager/ivoyager_core/blob/master/data/solar_system/planets.tsv) and provides access to processed, statically typed data. It can impute defaults, convert floats by specified units, prefix text, convert text enumerations to integers, and more! 
 
 This plugin works best in combination with our [Units](https://github.com/ivoyager/ivoyager_units) plugin. You can use it without that plugin, but you will need to supply your own unit coversion method to use any units functionality.
 
@@ -69,13 +69,13 @@ For debugging or work-in-progress, you can prevent any imported table from being
 
 #### Comments
 
-Any line starting with "#" is ignored. Additionally, entire columns are ignored if the column "field" name begins with "#".
+Any line starting with "#" is ignored. Additionally, entire columns are ignored if the column field name begins with "#".
 
 #### General Cell Processing
 
-All cells are stripped of double-quotes if they enclose the cell on both sides. These are silently added by some editors.
+All cells are stripped of double-quotes if they enclose the cell on both sides (these are silently added by some editors).
 
-Spaces are edge-stripped from cells and cell elements. ("Cell element" refers to comma- or semicolon-delimited data within cells of certain types, such as VECTORx, COLOR, and ARRAY[xxxx]).
+Spaces are edge-stripped from cells and cell elements ("cell element" refers to comma- or semicolon-delimited data within cells of certain types, such as VECTORx, COLOR, and ARRAY[xxxx]).
 
 #### Data Types
 
@@ -118,7 +118,7 @@ Most .csv/.tsv file editors will "interpret" and change (i.e., corrupt) table da
 
 ## DB_ENTITIES Format
 
-[Example Table](https://github.com/ivoyager/ivoyager/blob/master/data/solar_system/planets.tsv)
+[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/solar_system/planets.tsv)
 
 Optional specifier: `@DB_ENTITIES[=<table_name>]` (table_name defaults to the base file name)  
 Optional directive: `@DONT_PARSE`
@@ -135,7 +135,7 @@ After field names and before data, tables can have the following header rows in 
 * `Type` (required): See data types above.
 * `Default` (optional): Default values must be empty or follow Type rules above. If non-empty, this value is imputed for any empty cells in the column.
 * `Unit` (optional; FLOAT fields only): The data processor recognizes a broad set of unit symbols (mostly but not all SI) and, by default, converts table floats to SI base units in the postprocessed "internal" data. Default unit conversions are defined by "unit_multipliers" and "unit_lambdas" dictionaries [here](https://github.com/ivoyager/ivoyager_table_importer/blob/master/singletons/units.gd). Unit symbols and/or internal representation can be changed by specifying replacement conversion dictionaries in the `postprocess_tables()` call.
-* `Prefix` (optional; STRING, STRING_NAME and INT fields only): Prefixes any non-empty cells and `Default` (if specified) with provided prefix text. To prefix the column 0 implicit "name" field, use `Prefix/<entity prefix>`. E.g., we use `Prefix/PLANET_` in [planets.tsv](https://github.com/ivoyager/ivoyager/blob/master/data/solar_system/planets.tsv) to prefix all entity names with "PLANET_".
+* `Prefix` (optional; STRING, STRING_NAME and INT fields only): Prefixes any non-empty cells and `Default` (if specified) with provided prefix text. To prefix the column 0 implicit "name" field, use `Prefix/<entity prefix>`. E.g., we use `Prefix/PLANET_` in [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/data/solar_system/planets.tsv) to prefix all entity names with "PLANET_".
 
 #### Entity Names
 
@@ -181,7 +181,7 @@ As for DB_ENTITIES, you can obtain row_number from the "enumerations" dictionary
 
 ## WIKI_LOOKUP Format
 
-[Example Table](https://github.com/ivoyager/ivoyager/blob/master/data/solar_system/wiki_extras.tsv)
+[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/solar_system/wiki_extras.tsv)
 
 Required specifier: `@WIKI_LOOKUP[=<table_name>]` (table_name defaults to the base file name)  
 Optional directive: `@DONT_PARSE`
