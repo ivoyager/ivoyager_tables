@@ -49,36 +49,36 @@ extends Node
 
 
 ## Contains all postprocessed table data. See class comments for structure.
-var tables := {}
+var tables: Dictionary[StringName, Variant] = {}
 ## Indexed by 1st-column entity names from [b]all[/b] 'db-style' tables, which
 ## are required to be globally unique ([method postprocess_tables] will assert
 ## if this is not the case). Values are row number integers from the individual tables.
-var enumerations := {}
+var enumerations: Dictionary[StringName, int] = {}
 ## Contains 'enum-like' enumerations for each table as a separate dictionary. This
 ## dictionary is indexed by table name [i]and[/i] by individual entity (i.e. row) names. You
 ## can use the latter to obtain the full table enumeration given any single table entity name.
-var enumeration_dicts := {}
+var enumeration_dicts: Dictionary[StringName, Dictionary] = {}
 ## See [member enumeration_dicts]. This is the same except the enumerations are inverted
 ## (array index is the enumeration value).
-var enumeration_arrays := {}
+var enumeration_arrays: Dictionary[StringName, Array] = {}
 ## Number of rows for each 'db-style' table indexed by table name.
-var table_n_rows := {}
+var table_n_rows: Dictionary[StringName, int] = {}
 ## Indexed by table name for 'db-style' tables. This is the value specified as prefix
 ## for the 1st column entity names. E.g., in a planets.tsv table with entities
 ## PLANET_MERCURY, PLANET_VENUS, etc., it should be 'PLANET_'.
-var entity_prefixes := {}
+var entity_prefixes: Dictionary[StringName, String] = {}
 ## Not populated by default. Set [code]enable_wiki = true[/code] in [method postprocess_tables]
 ## to populate. Indexed by table 1st-column entity names and provides a wiki 'key' if provided in
 ## table (e.g., 'en.wiki' column). This is used by
 ## [url=https://github.com/ivoyager/planetarium]Planetarium[/url] to link to Wikipedia.org
 ## pages, but it should be reconfigurable to link to an internal game wiki.
-var wiki_lookup := {}
+var wiki_lookup: Dictionary[StringName, String] = {}
 ## Not populated by default. Set [code]enable_precisions = true[/code] in [method postprocess_tables]
 ## to populate. Has nested indexing structure exactly parallel with [member tables] except
 ## it only has FLOAT columns. Provides significant digits as determined from the table
 ## number text. This is useful only to science geeks making science projects like our
 ## [url=https://github.com/ivoyager/planetarium]Planetarium[/url] (for example).
-var precisions := {}
+var precisions: Dictionary[StringName, Dictionary] = {}
 ## Defines how text in table files is interpreted if the cell or Default is
 ## not empty. Constants are used [b]without[/b] any other specified postprocessing
 ## such as prefixing or unit conversion. The constant is used only if the type is
@@ -87,7 +87,7 @@ var precisions := {}
 ## is simply "inf" in a STRING column. User can add, replace or disable values by
 ## supplying [param merge_overwrite_table_constants] in [method postprocess_tables] (use null to
 ## disable an existing value).
-var table_constants := {
+var table_constants: Dictionary[StringName, Variant] = {
 	&"x" : true,
 	&"true" : true,
 	&"True" : true,
@@ -114,7 +114,7 @@ var table_constants := {
 ## Hence, we avoid potentially valid values such as 0, 0.0, Vector3.ZERO, Color.BLACK, etc.[br][br]
 ##
 ## WARNING: Don't replace TYPE_ARRAY : []. That's hard-coded!
-var missing_values := {
+var missing_values: Dictionary[int, Variant] = {
 	TYPE_BOOL : false,
 	TYPE_STRING : "",
 	TYPE_STRING_NAME : &"",
@@ -457,6 +457,22 @@ func get_db_float(table: StringName, field: StringName, row := -1, entity := &""
 ## Use for VECTOR3 field. Returns 'missing' value defined in [member missing_values]
 ## if empty cell or field does not exist (Vector3(-INF,-INF,-INF) by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func get_db_vector2(table: StringName, field: StringName, row := -1, entity := &"") -> Vector2:
+	assert(tables.has(table), "Specified table '%s' does not exist" % table)
+	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
+	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
+	var table_dict: Dictionary = tables[table]
+	if !table_dict.has(field):
+		return missing_values[TYPE_VECTOR2]
+	if entity:
+		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
+		row = enumerations[entity]
+	return table_dict[field][row]
+
+
+## Use for VECTOR3 field. Returns 'missing' value defined in [member missing_values]
+## if empty cell or field does not exist (Vector3(-INF,-INF,-INF) by default).
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func get_db_vector3(table: StringName, field: StringName, row := -1, entity := &"") -> Vector3:
 	assert(tables.has(table), "Specified table '%s' does not exist" % table)
 	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
@@ -464,6 +480,22 @@ func get_db_vector3(table: StringName, field: StringName, row := -1, entity := &
 	var table_dict: Dictionary = tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_VECTOR3]
+	if entity:
+		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
+		row = enumerations[entity]
+	return table_dict[field][row]
+
+
+## Use for VECTOR3 field. Returns 'missing' value defined in [member missing_values]
+## if empty cell or field does not exist (Vector3(-INF,-INF,-INF) by default).
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func get_db_vector4(table: StringName, field: StringName, row := -1, entity := &"") -> Vector4:
+	assert(tables.has(table), "Specified table '%s' does not exist" % table)
+	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
+	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
+	var table_dict: Dictionary = tables[table]
+	if !table_dict.has(field):
+		return missing_values[TYPE_VECTOR4]
 	if entity:
 		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
 		row = enumerations[entity]
@@ -500,6 +532,26 @@ func get_db_array(table: StringName, field: StringName, row := -1, entity := &""
 		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
 		row = enumerations[entity]
 	return table_dict[field][row]
+
+
+## Use for ARRAY[INT] field to generate a single flags value (int) by or'ing the
+## table array values. Returns 0 if empty cell or field does not exist.
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func get_db_array_as_flags(table: StringName, field: StringName, row := -1, entity := &"") -> int:
+	assert(tables.has(table), "Specified table '%s' does not exist" % table)
+	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
+	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
+	var table_dict: Dictionary = tables[table]
+	if !table_dict.has(field):
+		return 0
+	if entity:
+		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
+		row = enumerations[entity]
+	var array: Array[int] = table_dict[field][row]
+	var flags := 0
+	for flag in array:
+		flags |= flag
+	return flags
 
 
 ## Returns -1 if the field does not exist or is not type FLOAT.

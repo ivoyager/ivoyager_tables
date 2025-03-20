@@ -52,6 +52,8 @@ extends RefCounted
 ##    contains the moddable files (see comments above).
 ## 2. Add filter '*.unimported' (or a directory filter if you want) to
 ##    Project/Export/Resources/'Filters to export non-resource files/folders'.
+##
+## TODO: Type function arg arrays.
 
 const DEFAULT_BASE_FILES_README_TEXT := """Files are read-only!
 
@@ -193,14 +195,14 @@ func add_modding_base_files(relative_base_file_paths: Array) -> void:
 ## have to.
 func import_mod_tables(table_names: Array) -> void:
 	
-	var mod_table_paths := {}
+	var mod_table_paths: Dictionary[String, String] = {}
 	if DirAccess.dir_exists_absolute(_modding_mod_files_dir):
 		_add_table_paths_recursive(_modding_mod_files_dir, mod_table_paths)
 	if !mod_table_paths:
 		return # no mod tables!
 	
 	var modded_tables: Array[String] = [] # for print only
-	var modding_table_resources := {}
+	var modding_table_resources: Dictionary[String, IVTableResource] = {}
 	for name: String in table_names:
 		if !mod_table_paths.has(name):
 			continue
@@ -219,18 +221,18 @@ func import_mod_tables(table_names: Array) -> void:
 	table_postprocessor.set_modding_tables(modding_table_resources)
 
 
-func _add_table_paths_recursive(dir_path: String, dict: Dictionary) -> void:
+func _add_table_paths_recursive(dir_path: String, dict: Dictionary[String, String]) -> void:
 	# 'dir_path' must exist.
 	var dir := DirAccess.open(dir_path)
 	dir.list_dir_begin()
-	var file_or_dir_name := dir.get_next()
-	while file_or_dir_name:
-		var path := dir_path.path_join(file_or_dir_name)
+	var next_name := dir.get_next()
+	while next_name:
+		var path := dir_path.path_join(next_name)
 		if dir.current_is_dir():
 			_add_table_paths_recursive(path, dict)
-		elif file_or_dir_name.get_extension() == "tsv":
-			dict[file_or_dir_name.get_basename()] = path
-		file_or_dir_name = dir.get_next()
+		elif next_name.get_extension() == "tsv":
+			dict[next_name.get_basename()] = path
+		next_name = dir.get_next()
 
 
 func _get_original_table_path(name: String, original_table_paths: Array) -> String:
@@ -257,12 +259,12 @@ func _remove_files_recursive(dir_path: String, extension: String) -> void:
 	if !dir:
 		return
 	dir.list_dir_begin()
-	var file_or_dir_name := dir.get_next()
-	while file_or_dir_name:
+	var next_name := dir.get_next()
+	while next_name:
 		if dir.current_is_dir():
-			_remove_files_recursive(dir_path.path_join(file_or_dir_name), extension)
-			dir.remove(file_or_dir_name) # only happens if empty
-		elif !extension or file_or_dir_name.get_extension() == extension:
-			FileAccess.set_read_only_attribute(dir_path.path_join(file_or_dir_name), false)
-			dir.remove(file_or_dir_name)
-		file_or_dir_name = dir.get_next()
+			_remove_files_recursive(dir_path.path_join(next_name), extension)
+			dir.remove(next_name) # only happens if empty
+		elif !extension or next_name.get_extension() == extension:
+			FileAccess.set_read_only_attribute(dir_path.path_join(next_name), false)
+			dir.remove(next_name)
+		next_name = dir.get_next()

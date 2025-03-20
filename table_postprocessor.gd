@@ -29,30 +29,30 @@ const TableDirectives := IVTableResource.TableDirectives
 # from OS or TranslationServer, or how to do fallbacks for missing translations.
 var localized_wiki := &"en.wiki"
 
-var _tables: Dictionary # postprocessed data indexed [table_name][field_name][row_int]
-var _enumerations: Dictionary # indexed by ALL entity names (which are globally unique)
-var _enumeration_dicts: Dictionary # indexed by table name & all entity names
-var _enumeration_arrays: Dictionary # indexed as above
-var _table_n_rows: Dictionary # indexed by table name
-var _entity_prefixes: Dictionary # indexed by table name
-var _wiki_lookup: Dictionary # populated if enable_wiki
-var _precisions: Dictionary # populated if enable_precisions (indexed as tables for FLOAT fields)
+var _tables: Dictionary[StringName, Variant] # postprocessed data indexed [table_name][field_name][row_int]
+var _enumerations: Dictionary[StringName, int] # indexed by ALL entity names (which are globally unique)
+var _enumeration_dicts: Dictionary[StringName, Dictionary] # indexed by table name & all entity names
+var _enumeration_arrays: Dictionary[StringName, Array] # indexed as above
+var _table_n_rows: Dictionary[StringName, int] # indexed by table name
+var _entity_prefixes: Dictionary[StringName, String] # indexed by table name
+var _wiki_lookup: Dictionary[StringName, String] # populated if enable_wiki
+var _precisions: Dictionary[StringName, Dictionary] # populated if enable_precisions (indexed as tables for FLOAT fields)
 var _enable_wiki: bool
 var _enable_precisions: bool
-var _table_constants: Dictionary
-var _missing_values: Dictionary
+var _table_constants: Dictionary[StringName, Variant]
+var _missing_values: Dictionary[int, Variant]
 var _unit_conversion_method: Callable
 
-var _table_defaults := {} # only tables that might be modified
+var _table_defaults: Dictionary[StringName, Dictionary] = {} # only tables that might be modified
 
-var _modding_table_resources: Dictionary
+var _modding_table_resources: Dictionary[String, IVTableResource]
 
 var _start_msec: int
 var _count: int
 
 
 ## Called by IVTableModding. If used, must be called before [method postprocess].
-func set_modding_tables(modding_table_resources: Dictionary) -> void:
+func set_modding_tables(modding_table_resources: Dictionary[String, IVTableResource]) -> void:
 	_modding_table_resources = modding_table_resources
 
 

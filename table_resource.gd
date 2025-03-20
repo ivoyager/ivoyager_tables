@@ -52,7 +52,7 @@ enum TableDirectives {
 
 
 ## Arrays of any of these types are also supported.
-const SUPPORTED_TYPES := {
+const SUPPORTED_TYPES: Dictionary[StringName, int] = {
 	&"BOOL" : TYPE_BOOL,
 	&"INT" : TYPE_INT,
 	&"FLOAT" : TYPE_FLOAT,
@@ -105,11 +105,11 @@ const VERBOSE := true # prints a single line on import
 @export var modifies_table_name := &"" # DB_ENTITIES_MOD only
 
 # db style
-@export var dict_of_field_arrays: Dictionary # indexed data [field][row]
-@export var db_prefixes: Dictionary
-@export var db_types: Dictionary # ints indexed [field]
-@export var db_units: Dictionary # StringNames [field] (FLOAT fields if Unit exists)
-@export var db_import_defaults: Dictionary # indexed data [field] (if Default exists)
+@export var dict_of_field_arrays: Dictionary[StringName, Array] # indexed data [field][row]
+@export var db_prefixes: Dictionary[StringName, String]
+@export var db_types: Dictionary[StringName, int] # ints indexed [field]
+@export var db_units: Dictionary[StringName, StringName] # StringNames [field] (FLOAT fields if Unit exists)
+@export var db_import_defaults: Dictionary[StringName, int] # indexed data [field] (if Default exists)
 
 # enum x enum
 @export var array_of_arrays: Array[Array] # preprocessed data indexed [row_enum][column_enum]
@@ -118,7 +118,7 @@ const VERBOSE := true # prints a single line on import
 @export var exe_import_default: int
 
 # indexing
-@export var indexing := {"" : 0} # empty cell is always idx = 0
+@export var indexing: Dictionary[String, int] = {"" : 0} # empty cell is always idx = 0
 var next_idx := 1
 
 # debug data
@@ -390,7 +390,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 		for column: int in skip_column_0_iterator:
 			var field := column_names[column - 1]
 			var raw_value: String = line_array[column]
-			var preprocess_value: Variant
+			var preprocess_value: int
 			if !raw_value and db_import_defaults.has(field):
 				preprocess_value = db_import_defaults[field]
 			else:
