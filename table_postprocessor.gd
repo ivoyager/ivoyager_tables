@@ -296,14 +296,14 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 		for row in n_rows:
 			var import_idx: int = import_field[row]
 			var import_str: String = unindexing[import_idx]
-			new_field[row] = _get_postprocess_value(import_str, prefix, type, unit)
+			new_field[row] = _get_postprocess_value(import_str, type, prefix, unit)
 			_count += 1
 		table_dict[field] = new_field
 		# keep table default (temporarly) in case this table is modified
 		if has_entity_names:
 			var import_default_idx: int = import_defaults.get(field, 0)
 			var import_default_str: String = unindexing[import_default_idx]
-			var default: Variant = _get_postprocess_value(import_default_str, prefix, type, unit)
+			var default: Variant = _get_postprocess_value(import_default_str, type, prefix, unit)
 			defaults[field] = default
 		# wiki
 		if field == localized_wiki:
@@ -372,7 +372,7 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 		var unit: StringName = mod_units.get(field, &"")
 		var import_default_idx: int = mod_import_defaults.get(field, 0)
 		var import_default_str: String = unindexing[import_default_idx]
-		var postprocess_default: Variant = _get_postprocess_value(import_default_str, prefix, type,
+		var postprocess_default: Variant = _get_postprocess_value(import_default_str, type, prefix,
 				unit)
 		var field_type := type if type < TYPE_MAX else TYPE_ARRAY
 		var new_field := Array([], field_type, &"", null)
@@ -423,7 +423,7 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 			# FIXME: Don't overwrite if 0?
 			
 			var import_str: String = unindexing[import_idx]
-			table_dict[field][row] = _get_postprocess_value(import_str, prefix, type, unit)
+			table_dict[field][row] = _get_postprocess_value(import_str, type, prefix, unit)
 			_count += 1
 	
 	# add/overwrite wiki lookup
@@ -437,7 +437,7 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 					continue
 				var import_str: String = unindexing[import_idx]
 				var row_name := mod_row_names[mod_row]
-				_wiki_lookup[row_name] = _get_postprocess_value(import_str, "", TYPE_STRING_NAME, &"")
+				_wiki_lookup[row_name] = _get_postprocess_string_name(import_str, "")
 	
 	# add/overwrite precisions
 	if _enable_precisions:
@@ -467,7 +467,7 @@ func _postprocess_wiki_lookup(table_res: IVTableResource) -> void:
 		if !import_idx:
 			continue
 		var import_str: String = unindexing[import_idx]
-		_wiki_lookup[row_name] = _get_postprocess_value(import_str, "", TYPE_STRING, &"")
+		_wiki_lookup[row_name] = _get_postprocess_string(import_str, "")
 		_count += 1
 
 
@@ -486,7 +486,7 @@ func _postprocess_enum_x_enum(table_res: IVTableResource) -> void:
 	
 	var row_type := type if type < TYPE_MAX else TYPE_ARRAY
 	var import_default_str: String = unindexing[import_default_idx]
-	var postprocess_default: Variant = _get_postprocess_value(import_default_str, "", type, unit)
+	var postprocess_default: Variant = _get_postprocess_value(import_default_str, type, "", unit)
 	
 	assert(_enumeration_dicts.has(row_names[0]), "Unknown enumeration " + row_names[0])
 	assert(_enumeration_dicts.has(column_names[0]), "Unknown enumeration " + column_names[0])
@@ -515,7 +515,7 @@ func _postprocess_enum_x_enum(table_res: IVTableResource) -> void:
 			if !import_idx:
 				continue
 			var import_str: String = unindexing[import_idx]
-			var postprocess_value: Variant = _get_postprocess_value(import_str, "", type, unit)
+			var postprocess_value: Variant = _get_postprocess_value(import_str, type, "", unit)
 			_count += 1
 			table_array_of_arrays[row][column] = postprocess_value
 	
@@ -531,173 +531,248 @@ func _get_unindexing(indexing: Dictionary) -> Array[String]:
 	return unindexing
 
 
-func _get_postprocess_value(import_str: String, prefix: String, type: int, unit: StringName
+func _get_postprocess_value(import_str: String, type: int, prefix: String, unit: StringName
 		) -> Variant:
-	
-	import_str = import_str.strip_edges() # comma-delimited elements may have spaces
-	
-	# Table constant is used only if it is an expected type.
-	var constant_value: Variant = _table_constants.get(import_str) # usually null
-	var constant_type := typeof(constant_value)
 	
 	if type == TYPE_BOOL:
 		assert(!prefix, "Prefix not allowed for BOOL")
 		assert(!unit, "Unit not allowed for BOOL")
-		if !import_str:
-			return _missing_values[TYPE_BOOL]
-		if constant_type == TYPE_BOOL:
-			return constant_value
-		assert(false, "Unknown BOOL content '%s'" % import_str)
-		return false
-	
+		return _get_postprocess_bool(import_str)
 	if type == TYPE_FLOAT:
 		assert(!prefix, "Prefix not allowed for FLOAT")
-		if !import_str:
-			return _missing_values[TYPE_FLOAT]
-		if constant_type == TYPE_FLOAT:
-			return constant_value # no unit conversion!
-		var unit_split := import_str.split(" ", false, 1)
-		if unit_split.size() == 1:
-			# Possible "x/unit" needs conversion to "x 1/unit"
-			unit_split = import_str.split("/", false, 1)
-			if unit_split.size() == 2:
-				unit_split[1] = "1/" + unit_split[1]
-		if unit_split.size() == 2:
-			unit = StringName(unit_split[1]) # overrides column unit!
-		var float_str := unit_split[0].lstrip("~").replace("E", "e").replace("_", "").replace(",", "")
-		assert(float_str.is_valid_float(), 
-				"Invalid FLOAT! Before / after postprocessing: '%s' / '%s'" % [
-				unit_split[0], float_str])
-		var import_float := float_str.to_float()
-		#var import_float := unit_split[0].lstrip("~").to_float()
-		if unit:
-			return _unit_conversion_method.call(import_float, unit, true, true)
-		return import_float
-	
+		return _get_postprocess_float(import_str, unit)
 	if type == TYPE_STRING:
 		assert(!unit, "Unit not allowed for STRING")
-		if !import_str:
-			return _missing_values[TYPE_STRING]
-		if constant_type == TYPE_STRING:
-			return constant_value # no prefixing!
-		if constant_type == TYPE_STRING_NAME:
-			@warning_ignore("unsafe_call_argument")
-			return String(constant_value) # no prefixing!
-		if prefix:
-			import_str = prefix + import_str
-		import_str = import_str.c_unescape() # does not process '\uXXXX'
-		import_str = c_unescape_patch(import_str)
-		return import_str
-	
+		return _get_postprocess_string(import_str, prefix)
 	if type == TYPE_STRING_NAME:
 		assert(!unit, "Unit not allowed for STRING_NAME")
-		if !import_str:
-			return _missing_values[TYPE_STRING_NAME]
-		if constant_type == TYPE_STRING_NAME:
-			return constant_value # no prefixing!
-		if constant_type == TYPE_STRING:
-			@warning_ignore("unsafe_call_argument")
-			return StringName(constant_value) # no prefixing!
-		if prefix:
-			import_str = prefix + import_str
-		return StringName(import_str)
-	
-	if type == TYPE_INT: # imported as StringName for enumerations
+		return _get_postprocess_string_name(import_str, prefix)
+	if type == TYPE_INT:
 		assert(!unit, "Unit not allowed for INT")
-		if !import_str:
-			return _missing_values[TYPE_INT]
-		if constant_type == TYPE_INT:
-			return constant_value # no prefixing or enumeration test (assert above if collision)
-		if prefix:
-			import_str = prefix + import_str
-		if import_str.is_valid_int():
-			return import_str.to_int()
-		assert(_enumerations.has(import_str), "Unknown enumeration " + import_str)
-		return _enumerations[import_str]
-	
+		return _get_postprocess_int(import_str, prefix)
 	if type == TYPE_VECTOR2:
 		assert(!prefix, "Prefix not allowed for VECTOR2")
-		if !import_str:
-			return _missing_values[TYPE_VECTOR2]
-		if constant_type == TYPE_VECTOR2:
-			return constant_value
-		var import_split := import_str.split(",")
-		assert(import_split.size() == 2, "VECTOR2 values must be entered as 'x, y'")
-		var vector2 := Vector2()
-		for i in 2:
-			vector2[i] = _get_postprocess_value(import_split[i], "", TYPE_FLOAT, unit)
-		return vector2
-	
+		return _get_postprocess_vector2(import_str, unit)
 	if type == TYPE_VECTOR3:
 		assert(!prefix, "Prefix not allowed for VECTOR3")
-		if !import_str:
-			return _missing_values[TYPE_VECTOR3]
-		if constant_type == TYPE_VECTOR3:
-			return constant_value
-		var import_split := import_str.split(",")
-		assert(import_split.size() == 3, "VECTOR3 values must be entered as 'x, y, z'")
-		var vector3 := Vector3()
-		for i in 3:
-			vector3[i] = _get_postprocess_value(import_split[i], "", TYPE_FLOAT, unit)
-		return vector3
-	
+		return _get_postprocess_vector3(import_str, unit)
 	if type == TYPE_VECTOR4:
 		assert(!prefix, "Prefix not allowed for VECTOR4")
-		if !import_str:
-			return _missing_values[TYPE_VECTOR4]
-		if constant_type == TYPE_VECTOR4:
-			return constant_value
-		var import_split := import_str.split(",")
-		assert(import_split.size() == 4, "VECTOR4 values must be entered as 'x, y, z, w'")
-		var vector4 := Vector4()
-		for i in 4:
-			vector4[i] = _get_postprocess_value(import_split[i], "", TYPE_FLOAT, unit)
-		return vector4
-	
+		return _get_postprocess_vector4(import_str, unit)
 	if type == TYPE_COLOR:
 		assert(!prefix, "Prefix not allowed for COLOR")
-		# Unit here is weird but maybe user has a conversion unit?
-		if !import_str:
-			return _missing_values[TYPE_COLOR]
-		if constant_type == TYPE_COLOR:
-			return constant_value
-		var import_split := import_str.split(",")
-		var n_elements := import_split.size()
-		if n_elements <= 2: # string or string,alpha
-			var color_str := import_split[0]
-			var color := Color.from_string(color_str, Color(-INF, -INF, -INF, -INF))
-			assert(color != Color(-INF, -INF, -INF, -INF), "Unknown color string '%s'" % color_str)
-			if n_elements == 1:
-				return color
-			var alpha: float = _get_postprocess_value(import_split[1], "", TYPE_FLOAT, unit)
-			return Color(color, alpha)
-		assert(n_elements <= 4, "Numeric COLOR values must be entered as 'r, g, b' or 'r, g, b, a'")
-		var elements_color := Color()
-		for i in n_elements:
-			elements_color[i] = _get_postprocess_value(import_split[i], "", TYPE_FLOAT, unit)
-		return elements_color
-	
-	if type >= TYPE_MAX:
-		# This is an array of typed data...
+		assert(!unit, "Unit not allowed for COLOR")
+		return _get_postprocess_color(import_str)
+	if type >= TYPE_MAX: # This is an array of typed data...
 		var array_type := type - TYPE_MAX
-		assert(array_type < TYPE_MAX and array_type != TYPE_ARRAY, "Nested array not allowed")
-		# Constant OK but it has to have correct element type.
-		if constant_type == TYPE_ARRAY:
-			@warning_ignore("unsafe_cast")
-			if (constant_value as Array).get_typed_builtin() == array_type:
-				return constant_value
-		var array := Array([], array_type, &"", null)
-		if !import_str:
-			return array # empty typed array
-		var import_split := import_str.split(";")
-		var size := import_split.size()
-		array.resize(size)
-		for i in size:
-			array[i] = _get_postprocess_value(import_split[i], prefix, array_type, unit)
-		return array
+		assert(array_type < TYPE_MAX)
+		return _get_postprocess_array(import_str, array_type, prefix, unit)
 	
 	assert(false, "Unsupported type %s" % type)
 	return null
+
+
+func _get_postprocess_bool(import_str: String) -> bool:
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_BOOL]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_BOOL:
+		return constant_value
+	assert(false, "Could not interpret '%s' as BOOL" % import_str)
+	return false
+
+
+func _get_postprocess_float(import_str: String, unit: StringName) -> float:
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_FLOAT]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_FLOAT:
+		return constant_value # no unit conversion!
+	var unit_split := import_str.split(" ", false, 1)
+	if unit_split.size() == 1:
+		# Possible "x/unit" needs conversion to "x 1/unit"
+		unit_split = import_str.split("/", false, 1)
+		if unit_split.size() == 2:
+			unit_split[1] = "1/" + unit_split[1]
+	if unit_split.size() == 2:
+		unit = StringName(unit_split[1]) # overrides column unit!
+	var float_str := unit_split[0].lstrip("~").replace("E", "e").replace("_", "").replace(",", "")
+	assert(float_str.is_valid_float(), 
+			"Invalid FLOAT! Before / after postprocessing: '%s' / '%s'" % [
+			unit_split[0], float_str])
+	var import_float := float_str.to_float()
+	if unit:
+		return _unit_conversion_method.call(import_float, unit, true, true)
+	return import_float
+
+
+func _get_postprocess_string(import_str: String, prefix: String) -> String:
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_STRING]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	var constant_type := typeof(constant_value)
+	if constant_type == TYPE_STRING:
+		return constant_value
+	if constant_type == TYPE_STRING_NAME:
+		@warning_ignore("unsafe_call_argument")
+		return String(constant_value) # no prefixing!
+	if prefix:
+		import_str = prefix + import_str
+	import_str = import_str.c_unescape() # does not process '\uXXXX'
+	import_str = c_unescape_patch(import_str)
+	return import_str
+
+
+func _get_postprocess_string_name(import_str: String, prefix: String) -> StringName:
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_STRING_NAME]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	var constant_type := typeof(constant_value)
+	if constant_type == TYPE_STRING_NAME:
+		return constant_value # no prefixing!
+	if constant_type == TYPE_STRING:
+		@warning_ignore("unsafe_call_argument")
+		return StringName(constant_value) # no prefixing!
+	if prefix:
+		import_str = prefix + import_str
+	return StringName(import_str)
+
+
+func _get_postprocess_int(import_str: String, prefix: String, test_or := true) -> int:
+	# May be a table constant, an enum constant, a valid integer, or a hex or
+	# binary number ("0x"- or "0b"-prefixed). May also be a "|"-delimited list
+	# of any of the preceding, which specifies a bit-wise "or" operation on all
+	# elements (useful for flags).
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_INT]
+	if test_or and import_str.find("|") != -1: # or'ed flags
+		var flags := 0
+		for flag_str in import_str.split("|"):
+			flags |= _get_postprocess_int(flag_str, prefix, false)
+		return flags
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_INT:
+		return constant_value # no unit conversion!
+	if prefix:
+		import_str = prefix + import_str
+	if _enumerations.has(import_str):
+		return _enumerations[import_str]
+	import_str = import_str.replace("_", "") # ok in int, hex or bin numbers
+	if import_str.is_valid_int(): # digits only, possibly "-" prefixed
+		return import_str.to_int()
+	if import_str.is_valid_hex_number(true): # has "0x" or "-0x" prefix
+		return import_str.hex_to_int()
+	if import_str.begins_with("0b") or import_str.begins_with("-0b"): # no is_valid_bin_number()
+		return import_str.bin_to_int() # convert w/out valid test; input may be garbage
+	assert(false, "Could not interpret '%s' as INT. Missing enumeration?" % import_str)
+	return -1
+
+
+func _get_postprocess_vector2(import_str: String, unit: StringName) -> Vector2:
+	# Expects 2 comma-delimited float values, or a constant expression.
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_VECTOR2]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_VECTOR2:
+		return constant_value # no unit conversion!
+	var import_split := import_str.split(",")
+	assert(import_split.size() == 2, "VECTOR2 values must be entered as 'x, y'")
+	return Vector2(
+		_get_postprocess_float(import_split[0], unit),
+		_get_postprocess_float(import_split[1], unit),
+	)
+
+
+func _get_postprocess_vector3(import_str: String, unit: StringName) -> Vector3:
+	# Expects 3 comma-delimited float values, or a constant expression.
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_VECTOR3]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_VECTOR3:
+		return constant_value # no unit conversion!
+	var import_split := import_str.split(",")
+	assert(import_split.size() == 3, "VECTOR3 values must be entered as 'x, y, z'")
+	return Vector3(
+		_get_postprocess_float(import_split[0], unit),
+		_get_postprocess_float(import_split[1], unit),
+		_get_postprocess_float(import_split[2], unit),
+	)
+
+
+func _get_postprocess_vector4(import_str: String, unit: StringName) -> Vector4:
+	# Expects 4 comma-delimited float values, or a constant expression.
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_VECTOR4]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_VECTOR4:
+		return constant_value # no unit conversion!
+	var import_split := import_str.split(",")
+	assert(import_split.size() == 4, "VECTOR4 values must be entered as 'x, y, z, w'")
+	return Vector4(
+		_get_postprocess_float(import_split[0], unit),
+		_get_postprocess_float(import_split[1], unit),
+		_get_postprocess_float(import_split[2], unit),
+		_get_postprocess_float(import_split[3], unit),
+	)
+
+
+func _get_postprocess_color(import_str: String) -> Color:
+	# Expects comma-delimited cell with 1, 2, 3 or 4 elements, or a constant
+	# expression. If 1 or 2 elements, the first element must be a valid string
+	# color representation.
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_COLOR]
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_COLOR:
+		return constant_value
+	var import_split := import_str.split(",")
+	var n_elements := import_split.size()
+	if n_elements <= 2: # string or string,alpha
+		var color_str := import_split[0]
+		var color := Color.from_string(color_str, Color(-INF, -INF, -INF, -INF))
+		assert(color != Color(-INF, -INF, -INF, -INF), "Unknown color string '%s'" % color_str)
+		if n_elements == 1:
+			return color
+		return Color(color, _get_postprocess_float(import_split[1], &""))
+	assert(n_elements <= 4, "Numeric COLOR values must be entered as 'r, g, b' or 'r, g, b, a'")
+	var rgb_color := Color(
+		_get_postprocess_float(import_split[0], &""),
+		_get_postprocess_float(import_split[1], &""),
+		_get_postprocess_float(import_split[2], &""),
+	)
+	if n_elements == 3:
+		return rgb_color
+	return Color(rgb_color, _get_postprocess_float(import_split[3], &""))
+
+
+func _get_postprocess_array(import_str: String, array_type: int, prefix: String, unit: StringName
+		) -> Array:
+	# Expects semi-colon (;) delimited elements. Return array is always typed.
+	assert(array_type != TYPE_ARRAY, "Nested arrays not allowed")
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_ARRAY:
+		var constant_array: Array = constant_value
+		if constant_array.get_typed_builtin() == array_type:
+			return constant_array
+	var array := Array([], array_type, &"", null)
+	if !import_str:
+		return array # empty typed array
+	var import_split := import_str.split(";")
+	var size := import_split.size()
+	array.resize(size)
+	for i in size:
+		array[i] = _get_postprocess_value(import_split[i], array_type, prefix, unit)
+	return array
 
 
 func _get_float_str_precision(float_str: String) -> int:

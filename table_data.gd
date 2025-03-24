@@ -534,26 +534,6 @@ func get_db_array(table: StringName, field: StringName, row := -1, entity := &""
 	return table_dict[field][row]
 
 
-## Use for ARRAY[INT] field to generate a single flags value (int) by or'ing the
-## table array values. Returns 0 if empty cell or field does not exist.
-## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_array_as_flags(table: StringName, field: StringName, row := -1, entity := &"") -> int:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
-	if !table_dict.has(field):
-		return 0
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
-	var array: Array[int] = table_dict[field][row]
-	var flags := 0
-	for flag in array:
-		flags |= flag
-	return flags
-
-
 ## Returns -1 if the field does not exist or is not type FLOAT.
 ## Asserts if [code]enable_precisions = false[/code] (default) in [method postprocess_tables].
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
