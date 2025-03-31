@@ -4,9 +4,9 @@ This file documents changes to [ivoyager_tables](https://github.com/ivoyager/ivo
 
 File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [v0.0.3] - UNRELEASED
+## [v0.0.3] - 2025-03-31
 
-Under development using Godot 4.4.
+Developed using Godot 4.4.
 
 ### Added
 
@@ -37,5 +37,5 @@ This plugin resulted from splitting the now-depreciated [Table Importer](https:/
 
 v0.0.1 is almost a "drop-in" replacement for ivoyager_table_importer v0.0.9. The main breaking change is in the method signature for postprocess_tables(). The order is changed and you now MUST supply a unit coversion method (you probably want the one in the ivoyager_units plugin).
 
-[v0.0.3]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.2...HEAD
+[v0.0.3]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.2...v0.0.3
 [v0.0.2]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.1...v0.0.2
