@@ -269,9 +269,9 @@ func get_db_field_array(table: StringName, field: StringName) -> Array:
 	return table_dict[field] # read-only
 
 
+## Returns the first row that contains the specified item.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func db_find(table: StringName, field: StringName, value: Variant) -> int:
-	# Returns row number of value in field.
 	assert(tables.has(table), "Specified table '%s' does not exist" % table)
 	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
 	var table_dict: Dictionary = tables[table]
@@ -279,6 +279,24 @@ func db_find(table: StringName, field: StringName, value: Variant) -> int:
 		return -1
 	var field_array: Array = table_dict[field]
 	return field_array.find(value)
+
+
+## Returns the first row that has an array containing the specified item. Field
+## must be an ARRAY type.
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func db_find_in_array(table: StringName, field: StringName, value: Variant) -> int:
+	assert(tables.has(table), "Specified table '%s' does not exist" % table)
+	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
+	var table_dict: Dictionary = tables[table]
+	if !table_dict.has(field):
+		return -1
+	var field_array: Array = table_dict[field]
+	assert(field_array.get_typed_builtin() == TYPE_ARRAY, "Specified field is not an ARRAY type")
+	for row in field_array.size():
+		var item_array: Array = field_array[row]
+		if item_array.has(value):
+			return row
+	return -1
 
 
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
