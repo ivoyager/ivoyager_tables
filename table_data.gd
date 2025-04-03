@@ -299,6 +299,26 @@ func db_find_in_array(table: StringName, field: StringName, value: Variant) -> i
 	return -1
 
 
+## Searches for value in lookup_field and returns the corresponding (same row)
+## value in return_field. Use &"name" for lookup_field to search by 1st
+## column "entity" name. If value is not found or lookup_field or return_field
+## are not present, return will be return_missing (null if unspecified).
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func db_lookup(table: StringName, lookup_field: StringName, value: Variant,
+		return_field: StringName, return_missing: Variant = null) -> Variant:
+	assert(tables.has(table), "Specified table '%s' does not exist" % table)
+	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
+	var table_dict: Dictionary = tables[table]
+	if !table_dict.has(lookup_field) or !table_dict.has(return_field):
+		return return_missing
+	var lookup_column: Array = table_dict[lookup_field]
+	var row := lookup_column.find(value)
+	if row == -1:
+		return return_missing
+	var return_column: Array = table_dict[return_field]
+	return return_column[row]
+
+
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func count_db_matching(table: StringName, field: StringName, match_value: Variant) -> int:
 	# Returns -1 if field not found.
