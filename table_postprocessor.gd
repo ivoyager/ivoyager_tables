@@ -23,6 +23,9 @@ extends RefCounted
 ## Called by [IVTableData] and [IVTableModding]. Don't use this class directly.
 
 const TableDirectives := IVTableResource.TableDirectives
+const TABLE_ROW_TYPE := IVTableResource.TABLE_ROW_TYPE
+const ENUM_TYPE_OFFSET := IVTableResource.ENUM_TYPE_OFFSET
+const ARRAY_TYPE_OFFSET := IVTableResource.ARRAY_TYPE_OFFSET
 
 
 # TODO: Proper localization. I'm not sure if we're supposed to use get_locale()
@@ -42,11 +45,11 @@ var _enable_precisions: bool
 var _table_constants: Dictionary[StringName, Variant]
 var _missing_values: Dictionary[int, Variant]
 var _unit_conversion_method: Callable
-
+var _root: Node
 var _table_defaults: Dictionary[StringName, Dictionary] = {} # only tables that might be modified
-
 var _modding_table_resources: Dictionary[String, IVTableResource]
-
+var _class_scripts: Dictionary[StringName, String]
+var _script_constants: Dictionary[StringName, Dictionary]
 var _start_msec: int
 var _count: int
 
@@ -62,7 +65,7 @@ func postprocess(table_file_paths: Array[String], project_enums: Array[Dictionar
 		enumeration_arrays: Dictionary, table_n_rows: Dictionary, entity_prefixes: Dictionary,
 		wiki_lookup: Dictionary, precisions: Dictionary, enable_wiki: bool, enable_precisions: bool,
 		table_constants: Dictionary, missing_values: Dictionary,
-		unit_conversion_method: Callable) -> void:
+		unit_conversion_method: Callable, root: Node) -> void:
 	
 	_start_msec = Time.get_ticks_msec()
 	_count = 0
@@ -80,6 +83,7 @@ func postprocess(table_file_paths: Array[String], project_enums: Array[Dictionar
 	_table_constants = table_constants
 	_missing_values = missing_values
 	_unit_conversion_method = unit_conversion_method
+	_root = root
 	
 	# asserts
 	for key: String in table_constants:
@@ -274,6 +278,7 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 	var types := table_res.db_types
 	var import_defaults := table_res.db_import_defaults
 	var units := table_res.db_units
+	var enum_types := table_res.enum_types
 	var n_rows := table_res.n_rows
 	var unindexing := _get_unindexing(table_res.indexing)
 	
@@ -290,20 +295,21 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 		var prefix: String = prefixes.get(field, "")
 		var type: int = types[field]
 		var unit: StringName = units.get(field, &"")
-		var field_type := type if type < TYPE_MAX else TYPE_ARRAY
+		var field_type := _convert_preprocess_type(type)
 		var new_field := Array([], field_type, &"", null)
 		new_field.resize(n_rows)
 		for row in n_rows:
 			var import_idx: int = import_field[row]
 			var import_str: String = unindexing[import_idx]
-			new_field[row] = _get_postprocess_value(import_str, type, prefix, unit)
+			new_field[row] = _get_postprocess_value(import_str, type, prefix, unit, enum_types)
 			_count += 1
 		table_dict[field] = new_field
 		# keep table default (temporarly) in case this table is modified
 		if has_entity_names:
 			var import_default_idx: int = import_defaults.get(field, 0)
 			var import_default_str: String = unindexing[import_default_idx]
-			var default: Variant = _get_postprocess_value(import_default_str, type, prefix, unit)
+			var default: Variant = _get_postprocess_value(import_default_str, type, prefix, unit,
+					enum_types)
 			defaults[field] = default
 		# wiki
 		if field == localized_wiki:
@@ -358,6 +364,7 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 	var mod_import_defaults := table_res.db_import_defaults
 	var mod_units := table_res.db_units
 	var mod_n_rows := table_res.n_rows
+	var enum_types := table_res.enum_types
 	var precisions_dict: Dictionary
 	if _enable_precisions:
 		precisions_dict = _precisions[modifies_table_name]
@@ -373,8 +380,8 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 		var import_default_idx: int = mod_import_defaults.get(field, 0)
 		var import_default_str: String = unindexing[import_default_idx]
 		var postprocess_default: Variant = _get_postprocess_value(import_default_str, type, prefix,
-				unit)
-		var field_type := type if type < TYPE_MAX else TYPE_ARRAY
+				unit, enum_types)
+		var field_type := _convert_preprocess_type(type)
 		var new_field := Array([], field_type, &"", null)
 		new_field.resize(n_rows)
 		for row in n_rows:
@@ -423,7 +430,8 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 			# FIXME: Don't overwrite if 0?
 			
 			var import_str: String = unindexing[import_idx]
-			table_dict[field][row] = _get_postprocess_value(import_str, type, prefix, unit)
+			table_dict[field][row] = _get_postprocess_value(import_str, type, prefix, unit,
+					enum_types)
 			_count += 1
 	
 	# add/overwrite wiki lookup
@@ -481,12 +489,14 @@ func _postprocess_enum_x_enum(table_res: IVTableResource) -> void:
 	var import_array_of_arrays := table_res.array_of_arrays
 	var type: int = table_res.exe_type
 	var unit: StringName = table_res.exe_unit
+	var enum_types := table_res.enum_types
 	var import_default_idx: int = table_res.exe_import_default
 	var unindexing := _get_unindexing(table_res.indexing)
 	
-	var row_type := type if type < TYPE_MAX else TYPE_ARRAY
+	var row_type := _convert_preprocess_type(type)
 	var import_default_str: String = unindexing[import_default_idx]
-	var postprocess_default: Variant = _get_postprocess_value(import_default_str, type, "", unit)
+	var postprocess_default: Variant = _get_postprocess_value(import_default_str, type, "", unit,
+			enum_types)
 	
 	assert(_enumeration_dicts.has(row_names[0]), "Unknown enumeration " + row_names[0])
 	assert(_enumeration_dicts.has(column_names[0]), "Unknown enumeration " + column_names[0])
@@ -515,7 +525,8 @@ func _postprocess_enum_x_enum(table_res: IVTableResource) -> void:
 			if !import_idx:
 				continue
 			var import_str: String = unindexing[import_idx]
-			var postprocess_value: Variant = _get_postprocess_value(import_str, type, "", unit)
+			var postprocess_value: Variant = _get_postprocess_value(import_str, type, "", unit,
+					enum_types)
 			_count += 1
 			table_array_of_arrays[row][column] = postprocess_value
 	
@@ -531,44 +542,60 @@ func _get_unindexing(indexing: Dictionary) -> Array[String]:
 	return unindexing
 
 
-func _get_postprocess_value(import_str: String, type: int, prefix: String, unit: StringName
-		) -> Variant:
+func _convert_preprocess_type(preprocess_type: int) -> int:
+	if preprocess_type < TYPE_MAX:
+		return preprocess_type
+	if preprocess_type < ARRAY_TYPE_OFFSET:
+		return TYPE_INT # includes TABLE_ROW and all enums
+	return TYPE_ARRAY
+
+
+func _get_postprocess_value(import_str: String, preprocess_type: int, prefix: String,
+		unit: StringName, enum_types: Array[String]) -> Variant:
 	
-	if type == TYPE_BOOL:
+	if preprocess_type == TYPE_BOOL:
 		assert(!prefix, "Prefix not allowed for BOOL")
 		assert(!unit, "Unit not allowed for BOOL")
 		return _get_postprocess_bool(import_str)
-	if type == TYPE_FLOAT:
+	if preprocess_type == TYPE_FLOAT:
 		assert(!prefix, "Prefix not allowed for FLOAT")
 		return _get_postprocess_float(import_str, unit)
-	if type == TYPE_STRING:
+	if preprocess_type == TYPE_STRING:
 		assert(!unit, "Unit not allowed for STRING")
 		return _get_postprocess_string(import_str, prefix)
-	if type == TYPE_STRING_NAME:
+	if preprocess_type == TYPE_STRING_NAME:
 		assert(!unit, "Unit not allowed for STRING_NAME")
 		return _get_postprocess_string_name(import_str, prefix)
-	if type == TYPE_INT:
+	if preprocess_type == TYPE_INT:
 		assert(!unit, "Unit not allowed for INT")
 		return _get_postprocess_int(import_str, prefix)
-	if type == TYPE_VECTOR2:
+	if preprocess_type == TYPE_VECTOR2:
 		assert(!prefix, "Prefix not allowed for VECTOR2")
 		return _get_postprocess_vector2(import_str, unit)
-	if type == TYPE_VECTOR3:
+	if preprocess_type == TYPE_VECTOR3:
 		assert(!prefix, "Prefix not allowed for VECTOR3")
 		return _get_postprocess_vector3(import_str, unit)
-	if type == TYPE_VECTOR4:
+	if preprocess_type == TYPE_VECTOR4:
 		assert(!prefix, "Prefix not allowed for VECTOR4")
 		return _get_postprocess_vector4(import_str, unit)
-	if type == TYPE_COLOR:
+	if preprocess_type == TYPE_COLOR:
 		assert(!prefix, "Prefix not allowed for COLOR")
 		assert(!unit, "Unit not allowed for COLOR")
 		return _get_postprocess_color(import_str)
-	if type >= TYPE_MAX: # This is an array of typed data...
-		var array_type := type - TYPE_MAX
-		assert(array_type < TYPE_MAX)
-		return _get_postprocess_array(import_str, array_type, prefix, unit)
+	if preprocess_type == TABLE_ROW_TYPE:
+		assert(!unit, "Unit not allowed for TABLE_ROW")
+		return _get_postprocess_table_row(import_str, prefix)
+	if preprocess_type >= ARRAY_TYPE_OFFSET: # This is an array of typed data...
+		var preprocess_array_type := preprocess_type - ARRAY_TYPE_OFFSET
+		assert(preprocess_array_type < ARRAY_TYPE_OFFSET)
+		return _get_postprocess_array(import_str, preprocess_array_type, prefix, unit, enum_types)
+	if preprocess_type >= ENUM_TYPE_OFFSET:
+		assert(!unit, "Unit not allowed for enum types")
+		var enum_index := preprocess_type - ENUM_TYPE_OFFSET
+		var enum_str := enum_types[enum_index]
+		return _get_postprocess_enum(import_str, enum_str, prefix)
 	
-	assert(false, "Unsupported type %s" % type)
+	assert(false, "Unsupported preprocess_type %s" % preprocess_type)
 	return null
 
 
@@ -647,6 +674,9 @@ func _get_postprocess_int(import_str: String, prefix: String, test_or := true) -
 	# binary number ("0x"- or "0b"-prefixed). May also be a "|"-delimited list
 	# of any of the preceding, which specifies a bit-wise "or" operation on all
 	# elements (useful for flags).
+	
+	# WIP: Remove TABLE_ROW interpretation...
+	
 	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
 	if !import_str:
 		return _missing_values[TYPE_INT]
@@ -754,9 +784,24 @@ func _get_postprocess_color(import_str: String) -> Color:
 	return Color(rgb_color, _get_postprocess_float(import_split[3], &""))
 
 
-func _get_postprocess_array(import_str: String, array_type: int, prefix: String, unit: StringName
-		) -> Array:
+func _get_postprocess_table_row(import_str: String, prefix: String) -> int:
+	# Don't test for table constant or integer here. It must be a table row
+	# name or blank! (Blank returns -1 irrespective of _missing_values[TYPE_INT].)
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return -1
+	if prefix:
+		import_str = prefix + import_str
+	if _enumerations.has(import_str):
+		return _enumerations[import_str]
+	assert(false, "Could not interpret '%s' as TABLE_ROW" % import_str)
+	return -1
+
+
+func _get_postprocess_array(import_str: String, preprocess_array_type: int, prefix: String,
+		unit: StringName, enum_types: Array[String]) -> Array:
 	# Expects semi-colon (;) delimited elements. Return array is always typed.
+	var array_type := _convert_preprocess_type(preprocess_array_type)
 	assert(array_type != TYPE_ARRAY, "Nested arrays not allowed")
 	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
 	var constant_value: Variant = _table_constants.get(import_str) # usually null
@@ -771,8 +816,101 @@ func _get_postprocess_array(import_str: String, array_type: int, prefix: String,
 	var size := import_split.size()
 	array.resize(size)
 	for i in size:
-		array[i] = _get_postprocess_value(import_split[i], array_type, prefix, unit)
+		array[i] = _get_postprocess_value(import_split[i], preprocess_array_type, prefix, unit,
+				enum_types)
 	return array
+
+
+func _get_postprocess_enum(import_str: String, enum_str: String, prefix: String,
+		test_bitwise_or := true) -> int:
+	# May be a table constant, a valid integer (including "0x"- or "0b"-prefixed),
+	# or a valid enum in "ClassName[.EnumName]" format. We test for table constant
+	# or valid integer before applying prefix.
+	# May also be a "|"-delimited list of any of the preceding, which specifies
+	# a bit-wise "or" operation on all elements (useful for flags).
+	
+	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
+	if !import_str:
+		return _missing_values[TYPE_INT]
+	# bitwise or list
+	if test_bitwise_or and import_str.find("|") != -1: # or'ed flags
+		var flags := 0
+		for flag_str in import_str.split("|"):
+			flags |= _get_postprocess_enum(flag_str, enum_str, prefix, false)
+		return flags
+	# constant test
+	var constant_value: Variant = _table_constants.get(import_str) # usually null
+	if typeof(constant_value) == TYPE_INT:
+		return constant_value # no prefix!
+	# integer test (w/out prefix)
+	var integer_test_str := import_str.replace("_", "") # ignored in int, hex or bin numbers
+	if integer_test_str.is_valid_int(): # digits only, possibly "-" prefixed
+		return integer_test_str.to_int()
+	if integer_test_str.is_valid_hex_number(true): # has "0x" or "-0x" prefix
+		return integer_test_str.hex_to_int()
+	if integer_test_str.begins_with("0b") or integer_test_str.begins_with("-0b"):
+		# No is_valid_bin_number(). Just convert it anyway.
+		return integer_test_str.bin_to_int()
+	# enum fallthrough
+	if prefix:
+		import_str = prefix + import_str
+	return _get_enum_value(enum_str, import_str)
+
+
+func _get_enum_value(enum_str: String, value_str: String) -> int:
+	var enum_split := enum_str.split(".")
+	var class_name_ := StringName(enum_split[0])
+	var enum_name := &""
+	if enum_split.size() > 1:
+		enum_name = StringName(enum_split[1])
+	
+	# Godot class including singletons (enum_name tested if present but not used)
+	if ClassDB.class_exists(class_name_):
+		assert(!enum_name or ClassDB.class_has_enum(class_name_, enum_name),
+				"Enum '%s' doesn't exist in Godot class '%s'" % [enum_name, class_name_])
+		assert(ClassDB.class_has_integer_constant(class_name_, value_str),
+				"Integer constant '%s' doesn't exist in Godot class '%s'" %
+				[value_str, class_name_])
+		return ClassDB.class_get_integer_constant(class_name_, value_str)
+	
+	# This is the catchall assert for most accidentally mangled Type strings...
+	assert(enum_name, ("'%s' is not a supported type or Godot class" % enum_str)
+			+ "; project enums must be formatted as 'MyClass.MyEnum'")
+	
+	# Project autoload
+	var autoload := _root.get_node_or_null(enum_split[0])
+	if autoload:
+		assert(typeof(autoload.get(enum_name)) == TYPE_DICTIONARY,
+				"Enum '%s' doesn't exist in autoload '%s'" % [enum_name, class_name_])
+		var enum_dict: Dictionary = autoload.get(enum_name)
+		assert(enum_dict.has(value_str), "Unknown enum key '%s' in '%s'" % [value_str, enum_str])
+		return enum_dict[value_str]
+	
+	# Project class
+	if !_class_scripts:
+		_populate_class_scripts()
+	if _class_scripts.has(class_name_):
+		if !_script_constants.has(class_name_):
+			var script: Script = load(_class_scripts[class_name_])
+			assert(script, "Could not load script at '%s'" % _class_scripts[class_name_])
+			_script_constants[class_name_] = script.get_script_constant_map()
+		var constants := _script_constants[class_name_]
+		var constant: Variant = constants.get(enum_name)
+		assert(typeof(constant) == TYPE_DICTIONARY, 
+				"Enum '%s' doesn't exist in class '%s'" % [enum_name, class_name_])
+		var enum_dict: Dictionary = constant
+		assert(enum_dict.has(value_str), "Unknown enum key '%s' in '%s'" % [value_str, enum_str])
+		return enum_dict[value_str]
+	
+	assert(false, "Unknown class '%s' in type '%s'" % [class_name_, enum_str])
+	return -1
+
+
+func _populate_class_scripts() -> void:
+	# only if we need it...
+	for dict in ProjectSettings.get_global_class_list():
+		assert(dict.path, "No path for script class '%s'" % dict.class) # can this happen?
+		_class_scripts[dict.class] = dict.path
 
 
 func _get_float_str_precision(float_str: String) -> int:

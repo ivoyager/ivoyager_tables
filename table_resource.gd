@@ -51,8 +51,12 @@ enum TableDirectives {
 }
 
 
-## Arrays of any of these types are also supported.
-const SUPPORTED_TYPES: Dictionary[StringName, int] = {
+const TABLE_ROW_TYPE := 999 # >>TYPE_MAX
+const ENUM_TYPE_OFFSET := TABLE_ROW_TYPE + 1 # enums between this and ARRAY_TYPE_OFFSET
+const ARRAY_TYPE_OFFSET := ENUM_TYPE_OFFSET * 2
+
+## Non-array and non-enum preprocess types that are supported.
+const BASE_TYPES: Dictionary[StringName, int] = {
 	&"BOOL" : TYPE_BOOL,
 	&"INT" : TYPE_INT,
 	&"FLOAT" : TYPE_FLOAT,
@@ -62,6 +66,7 @@ const SUPPORTED_TYPES: Dictionary[StringName, int] = {
 	&"VECTOR3" : TYPE_VECTOR3,
 	&"VECTOR4" : TYPE_VECTOR4,
 	&"COLOR" : TYPE_COLOR,
+	&"TABLE_ROW" : TABLE_ROW_TYPE,
 }
 
 const UNIT_ALLOWED_TYPES: Array[int] = [TYPE_FLOAT, TYPE_VECTOR2, TYPE_VECTOR3, TYPE_VECTOR4,
@@ -118,6 +123,7 @@ const VERBOSE := true # prints a single line on import
 @export var exe_import_default: int
 
 # indexing
+@export var enum_types: Array[String] # index here is type - ENUM_TYPE_OFFSET
 @export var indexing: Dictionary[String, int] = {"" : 0} # empty cell is always idx = 0
 var next_idx := 1
 
@@ -308,7 +314,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 				for column: int in skip_column_0_iterator:
 					assert(line_array[column], "Missing Type in %s, %s, %s" % [path, row, column])
 					var field := column_names[column - 1]
-					db_types[field] = _get_postprocess_type(line_array[column])
+					db_types[field] = _get_preprocess_type(line_array[column])
 				has_types = true
 				row += 1
 				continue
@@ -357,7 +363,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 			for field: StringName in db_units:
 				var type: int = db_types[field]
 				assert(UNIT_ALLOWED_TYPES.has(type) if type < TYPE_MAX
-						else UNIT_ALLOWED_TYPES.has(type - TYPE_MAX),
+						else UNIT_ALLOWED_TYPES.has(type - ARRAY_TYPE_OFFSET),
 						"Unit specified in column type that should not have unit; '%s', %s" % [
 						field, path])
 			
@@ -424,7 +430,7 @@ func _preprocess_enum_x_enum(cells: Array[Array]) -> void:
 	var type_pos := specific_directives.find(TableDirectives.DATA_TYPE)
 	assert(type_pos >= 0, "Table format requires @DATA_TYPE in " + path)
 	var raw_type := specific_directive_args[type_pos]
-	exe_type = _get_postprocess_type(raw_type)
+	exe_type = _get_preprocess_type(raw_type)
 	var raw_default := ""
 	var default_pos := specific_directives.find(TableDirectives.DATA_DEFAULT)
 	if default_pos >= 0:
@@ -434,7 +440,7 @@ func _preprocess_enum_x_enum(cells: Array[Array]) -> void:
 	exe_unit = &""
 	if unit_pos >= 0:
 		assert(UNIT_ALLOWED_TYPES.has(exe_type) if exe_type < TYPE_MAX
-				else UNIT_ALLOWED_TYPES.has(exe_type - TYPE_MAX),
+				else UNIT_ALLOWED_TYPES.has(exe_type - ARRAY_TYPE_OFFSET),
 				"Can't use '@DATA_UNIT' in this table type: " + path)
 		exe_unit = StringName(specific_directive_args[unit_pos])
 	if specific_directives.has(TableDirectives.TRANSPOSE):
@@ -489,21 +495,29 @@ func _preprocess_enum_x_enum(cells: Array[Array]) -> void:
 		row += 1
 
 
-func _get_postprocess_type(type_str: StringName) -> int:
+func _get_preprocess_type(type_str: StringName) -> int:
 	
-	if SUPPORTED_TYPES.has(type_str):
-		return SUPPORTED_TYPES[type_str]
-	
-	# Array types are encoded using int values >= TYPE_MAX. We don't expect to
-	# ever want nested arrays so don't recurse here.
+	if BASE_TYPES.has(type_str):
+		return BASE_TYPES[type_str]
+	 
+	# Array types are encoded using int values >= ARRAY_TYPE_OFFSET.
+	# We don't expect to ever want nested arrays.
 	if type_str.begins_with("ARRAY[") and type_str.ends_with("]"):
 		var array_type_str := type_str.trim_prefix("ARRAY[").trim_suffix("]")
-		var array_type: int = SUPPORTED_TYPES.get(array_type_str, -1)
-		assert(array_type != -1, "Missing or unsupported array Type '%s' in %s" % [type_str, path])
-		return TYPE_MAX + array_type
+		assert(!array_type_str.begins_with("ARRAY"), "Nested ARRAY not supported.")
+		
+		# FIXME: Enums
+		var array_type := _get_preprocess_type(array_type_str)
+		
+		return ARRAY_TYPE_OFFSET + array_type
 	
-	assert(false, "Missing or unsupported Type '%s' in %s" % [type_str, path])
-	return -1
+	# Otherwise, we have to assume it is a valid enum specification. These will
+	# be tested in postprocessing.
+	var enum_index := enum_types.find(type_str)
+	if enum_index == -1:
+		enum_index = enum_types.size()
+		enum_types.append(type_str)
+	return ENUM_TYPE_OFFSET + enum_index
 
 
 func _get_value_index(value: String) -> int:

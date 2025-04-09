@@ -186,7 +186,7 @@ func postprocess_tables(table_file_paths: Array,
 	table_postprocessor.postprocess(table_file_paths_, project_enums_, tables, enumerations,
 			enumeration_dicts, enumeration_arrays, table_n_rows, entity_prefixes, wiki_lookup,
 			precisions, enable_wiki, enable_precisions, table_constants, missing_values,
-			unit_conversion_method)
+			unit_conversion_method, get_tree().get_root())
 	table_postprocessor = null
 
 
