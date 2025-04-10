@@ -76,7 +76,7 @@ func postprocess(
 		missing_values: Dictionary[int, Variant],
 		unit_conversion_method: Callable,
 		root: Node
-		) -> void:
+	) -> void:
 	
 	_start_msec = Time.get_ticks_msec()
 	_count = 0
@@ -101,7 +101,6 @@ func postprocess(
 		var value: Variant = table_constants[key]
 		if typeof(value) == TYPE_INT:
 			assert(!enumerations.has(key))
-	
 	
 	var table_resources: Array[IVTableResource] = []
 	for path in table_file_paths:
@@ -135,7 +134,6 @@ func postprocess(
 	
 	# postprocess data by format
 	for table_res in table_resources:
-		
 		match table_res.table_format:
 			TableDirectives.DB_ENTITIES:
 				_postprocess_db_table(table_res, true)
@@ -555,8 +553,9 @@ func _get_postprocess_value(import_str: String, preprocess_type: int, prefix: St
 		assert(!unit, "Unit not allowed for STRING_NAME")
 		return _get_postprocess_string_name(import_str, prefix)
 	if preprocess_type == TYPE_INT:
+		assert(!prefix, "Prefix not allowed for INT")
 		assert(!unit, "Unit not allowed for INT")
-		return _get_postprocess_int(import_str, prefix)
+		return _get_postprocess_int(import_str)
 	if preprocess_type == TYPE_VECTOR2:
 		assert(!prefix, "Prefix not allowed for VECTOR2")
 		return _get_postprocess_vector2(import_str, unit)
@@ -634,8 +633,7 @@ func _get_postprocess_string(import_str: String, prefix: String) -> String:
 	if constant_type == TYPE_STRING_NAME:
 		@warning_ignore("unsafe_call_argument")
 		return String(constant_value) # no prefixing!
-	if prefix:
-		import_str = prefix + import_str
+	import_str = prefix + import_str
 	import_str = import_str.c_unescape() # does not process '\uXXXX'
 	import_str = c_unescape_patch(import_str)
 	return import_str
@@ -652,42 +650,34 @@ func _get_postprocess_string_name(import_str: String, prefix: String) -> StringN
 	if constant_type == TYPE_STRING:
 		@warning_ignore("unsafe_call_argument")
 		return StringName(constant_value) # no prefixing!
-	if prefix:
-		import_str = prefix + import_str
+	import_str = prefix + import_str
 	return StringName(import_str)
 
 
-func _get_postprocess_int(import_str: String, prefix: String, test_or := true) -> int:
-	# May be a table constant, an enum constant, a valid integer, or a hex or
-	# binary number ("0x"- or "0b"-prefixed). May also be a "|"-delimited list
-	# of any of the preceding, which specifies a bit-wise "or" operation on all
-	# elements (useful for flags).
-	
-	# WIP: Remove TABLE_ROW interpretation...
-	
+func _get_postprocess_int(import_str: String, test_bitwise_or := true) -> int:
+	# May be a table constant or a valid integer (including "0x"- or "0b"-prefixed).
+	# May also be a "|"-delimited list of any of the preceding, which specifies a
+	# bit-wise or operation on all elements (useful for flags).
 	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
 	if !import_str:
 		return _missing_values[TYPE_INT]
-	if test_or and import_str.find("|") != -1: # or'ed flags
+	if test_bitwise_or and import_str.find("|") != -1: # or'ed flags
 		var flags := 0
 		for flag_str in import_str.split("|"):
-			flags |= _get_postprocess_int(flag_str, prefix, false)
+			flags |= _get_postprocess_int(flag_str, false)
 		return flags
 	var constant_value: Variant = _table_constants.get(import_str) # usually null
 	if typeof(constant_value) == TYPE_INT:
-		return constant_value # no unit conversion!
-	if prefix:
-		import_str = prefix + import_str
-	if _enumerations.has(import_str):
-		return _enumerations[import_str]
+		return constant_value
 	import_str = import_str.replace("_", "") # ok in int, hex or bin numbers
 	if import_str.is_valid_int(): # digits only, possibly "-" prefixed
 		return import_str.to_int()
 	if import_str.is_valid_hex_number(true): # has "0x" or "-0x" prefix
 		return import_str.hex_to_int()
-	if import_str.begins_with("0b") or import_str.begins_with("-0b"): # no is_valid_bin_number()
+	if import_str.begins_with("0b") or import_str.begins_with("-0b"):
+		# No is_valid_bin_number() method as of Godot 4.4. Just convert it anyway.
 		return import_str.bin_to_int() # convert w/out valid test; input may be garbage
-	assert(false, "Could not interpret '%s' as INT. Missing enumeration?" % import_str)
+	assert(false, "Could not interpret '%s' as INT" % import_str)
 	return -1
 
 
@@ -778,11 +768,10 @@ func _get_postprocess_table_row(import_str: String, prefix: String) -> int:
 	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
 	if !import_str:
 		return -1
-	if prefix:
-		import_str = prefix + import_str
+	import_str = prefix + import_str
 	if _enumerations.has(import_str):
 		return _enumerations[import_str]
-	assert(false, "Could not interpret '%s' as TABLE_ROW" % import_str)
+	assert(false, "'%s' in column type TABLE_ROW but did not find in any table" % import_str)
 	return -1
 
 
@@ -815,7 +804,7 @@ func _get_postprocess_enum(import_str: String, enum_str: String, prefix: String,
 	# or a valid enum in "ClassName[.EnumName]" format. We test for table constant
 	# or valid integer before applying prefix.
 	# May also be a "|"-delimited list of any of the preceding, which specifies
-	# a bit-wise "or" operation on all elements (useful for flags).
+	# a bit-wise or operation on all elements (useful for flags).
 	
 	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
 	if !import_str:
@@ -831,17 +820,16 @@ func _get_postprocess_enum(import_str: String, enum_str: String, prefix: String,
 	if typeof(constant_value) == TYPE_INT:
 		return constant_value # no prefix!
 	# integer test (w/out prefix)
-	var integer_test_str := import_str.replace("_", "") # ignored in int, hex or bin numbers
-	if integer_test_str.is_valid_int(): # digits only, possibly "-" prefixed
-		return integer_test_str.to_int()
-	if integer_test_str.is_valid_hex_number(true): # has "0x" or "-0x" prefix
-		return integer_test_str.hex_to_int()
-	if integer_test_str.begins_with("0b") or integer_test_str.begins_with("-0b"):
-		# No is_valid_bin_number(). Just convert it anyway.
-		return integer_test_str.bin_to_int()
+	var integer_str := import_str.replace("_", "") # ignored in int, hex or bin numbers
+	if integer_str.is_valid_int(): # digits only, possibly "-" prefixed
+		return integer_str.to_int()
+	if integer_str.is_valid_hex_number(true): # has "0x" or "-0x" prefix
+		return integer_str.hex_to_int()
+	if integer_str.begins_with("0b") or integer_str.begins_with("-0b"):
+		# No is_valid_bin_number() method as of Godot 4.4. Just convert it anyway.
+		return integer_str.bin_to_int()
 	# enum fallthrough
-	if prefix:
-		import_str = prefix + import_str
+	import_str = prefix + import_str
 	return _get_enum_value(enum_str, import_str)
 
 
@@ -857,13 +845,12 @@ func _get_enum_value(enum_str: String, value_str: String) -> int:
 		assert(!enum_name or ClassDB.class_has_enum(class_name_, enum_name),
 				"Enum '%s' doesn't exist in Godot class '%s'" % [enum_name, class_name_])
 		assert(ClassDB.class_has_integer_constant(class_name_, value_str),
-				"Integer constant '%s' doesn't exist in Godot class '%s'" %
-				[value_str, class_name_])
+				"Integer constant '%s' doesn't exist in Godot class '%s'" % [value_str, class_name_])
 		return ClassDB.class_get_integer_constant(class_name_, value_str)
 	
-	# This is the catchall assert for most accidentally mangled Type strings...
-	assert(enum_name, ("'%s' is not a supported type or Godot class" % enum_str)
-			+ "; project enums must be formatted as 'MyClass.MyEnum'")
+	# This is the catchall assert for accidentally mangled Type strings...
+	assert(enum_name, ("'%s' is not a supported type or Godot class or project enum"
+			+ " (formatted as 'MyClass.MyEnum'). Mangled Type?") % enum_str)
 	
 	# Project autoload
 	var autoload := _root.get_node_or_null(enum_split[0])

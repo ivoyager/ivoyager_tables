@@ -8,10 +8,19 @@ File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 Developed using Godot 4.4.1.
 
+IMPORTANT: Re-import all tables after applying this upgrade!
+
+### Added
+
+* New column type TABLE_ROW to specify entities found in tables.
+* New column type formated as "ClassName[.EnumName]" to specify Godot or project enums. ".EnumName" is optional for Godot classes but required for project classes. Cell can be a "|"-delimited list for bitwise or'ing as for INT columns.
+
 ### Changed
 
+* [Table breaking] Table row names and project enums are no longer allowed in type INT columns. Use the new TABLE_ROW or "ClassName[.EnumName]" types.
+* [API breaking] Changed postprocess_tables() signature.
 * [API breaking] Simplified all "get" functions to require row without entity option. (Row is super easy to get.)
-* [API breaking] Streamlined API so db_build_dictionary() and db_build_object() handle cases w/ or w/out field specification.
+* [API breaking] Streamlined API so db_build_dictionary() and db_build_object() handle cases with or without field specification.
 * [API breaking] Changed other function signatures.
 
 ## [v0.0.3] - 2025-03-31
