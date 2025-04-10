@@ -33,14 +33,17 @@ const ARRAY_TYPE_OFFSET := IVTableResource.ARRAY_TYPE_OFFSET
 var localized_wiki := &"en.wiki"
 
 
-var _tables: Dictionary[StringName, Variant] # postprocessed data indexed [table_name][field_name][row_int]
+var _db_tables: Dictionary[StringName, Dictionary]
+var _exe_tables: Dictionary[StringName, Array]
+
+
 var _enumerations: Dictionary[StringName, int] # indexed by ALL entity names (which are globally unique)
 var _enumeration_dicts: Dictionary[StringName, Dictionary] # indexed by table name & all entity names
 var _enumeration_arrays: Dictionary[StringName, Array] # indexed as above
 var _table_n_rows: Dictionary[StringName, int] # indexed by table name
 var _entity_prefixes: Dictionary[StringName, String] # indexed by table name
-var _wiki_lookup: Dictionary[StringName, String] # populated if enable_wiki
-var _precisions: Dictionary[StringName, Dictionary] # populated if enable_precisions (indexed as tables for FLOAT fields)
+var _wiki_lookup: Dictionary[StringName, String] # if enable_wiki;
+var _precisions: Dictionary[StringName, Dictionary] # if enable_precisions
 var _enable_wiki: bool
 var _enable_precisions: bool
 var _table_constants: Dictionary[StringName, Variant]
@@ -63,7 +66,8 @@ func set_modding_tables(modding_table_resources: Dictionary[String, IVTableResou
 ## Called by IVTableData.
 func postprocess(
 		table_file_paths: Array[String],
-		tables: Dictionary[StringName, Variant],
+		db_tables: Dictionary[StringName, Dictionary],
+		exe_tables: Dictionary[StringName, Array],
 		enumerations: Dictionary[StringName, int],
 		enumeration_dicts: Dictionary[StringName, Dictionary],
 		enumeration_arrays: Dictionary[StringName, Array],
@@ -82,7 +86,8 @@ func postprocess(
 	_start_msec = Time.get_ticks_msec()
 	_count = 0
 	
-	_tables = tables
+	_db_tables = db_tables
+	_exe_tables = exe_tables
 	_enumerations = enumerations
 	_enumeration_dicts = enumeration_dicts
 	_enumeration_arrays = enumeration_arrays
@@ -150,7 +155,11 @@ func postprocess(
 				_postprocess_entity_x_entity(table_res)
 	
 	# make all containers read-only
-	tables.make_read_only()
+	
+	# TODO: make_read_only_deep()
+	
+	db_tables.make_read_only()
+	exe_tables.make_read_only()
 	enumerations.make_read_only()
 	enumeration_dicts.make_read_only()
 	enumeration_arrays.make_read_only()
@@ -159,21 +168,21 @@ func postprocess(
 	wiki_lookup.make_read_only()
 	precisions.make_read_only()
 	
-	for table_name: StringName in tables:
-		if typeof(tables[table_name]) == TYPE_DICTIONARY:
-			var dict_of_field_arrays: Dictionary = tables[table_name]
-			dict_of_field_arrays.make_read_only()
-			for field: StringName in dict_of_field_arrays:
-				var field_array: Array = dict_of_field_arrays[field]
-				field_array.make_read_only()
-				if field_array.get_typed_builtin() == TYPE_ARRAY:
-					for array: Array in field_array:
-						array.make_read_only()
-		else:
-			var array_of_arrays: Array[Array] = tables[table_name]
-			array_of_arrays.make_read_only()
-			for array in array_of_arrays:
-				array.make_read_only()
+	for table_name in db_tables:
+		var dict_of_field_arrays := db_tables[table_name]
+		dict_of_field_arrays.make_read_only()
+		for field: StringName in dict_of_field_arrays:
+			var field_array: Array = dict_of_field_arrays[field]
+			field_array.make_read_only()
+			if field_array.get_typed_builtin() == TYPE_ARRAY:
+				for array: Array in field_array:
+					array.make_read_only()
+	
+	for table_name in exe_tables:
+		var array_of_arrays: Array[Array] = exe_tables[table_name]
+		array_of_arrays.make_read_only()
+		for array in array_of_arrays:
+			array.make_read_only()
 	
 	for key: StringName in enumeration_dicts:
 		var enumeration_dict: Dictionary = enumeration_dicts[key]
@@ -322,7 +331,7 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 				precisions_field[row] = _get_float_str_precision(float_string)
 			_precisions[table_name][field] = precisions_field
 	
-	_tables[table_name] = table_dict
+	_db_tables[table_name] = table_dict
 	_table_n_rows[table_name] = n_rows
 	
 	if has_entity_names:
@@ -334,10 +343,10 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 	# We don't modify the table resource. We do modify postprocessed table.
 	# TODO: Should work if >1 mod table for existing table, but need to test.
 	var modifies_table_name := table_res.modifies_table_name
-	assert(_tables.has(modifies_table_name), "Can't modify missing table " + modifies_table_name)
+	assert(_db_tables.has(modifies_table_name), "Can't modify missing table " + modifies_table_name)
 	assert(_entity_prefixes[modifies_table_name] == table_res.entity_prefix,
 			"Mod table Prefix/<entity_name> header must match modified table")
-	var table_dict: Dictionary = _tables[modifies_table_name]
+	var table_dict: Dictionary = _db_tables[modifies_table_name]
 	assert(table_dict.has(&"name"), "Modified table must have 'name' field")
 	var defaults: Dictionary = _table_defaults[modifies_table_name]
 	var n_rows: int = _table_n_rows[modifies_table_name]
@@ -517,7 +526,7 @@ func _postprocess_entity_x_entity(table_res: IVTableResource) -> void:
 			_count += 1
 			table_array_of_arrays[row][column] = postprocess_value
 	
-	_tables[table_name] = table_array_of_arrays
+	_exe_tables[table_name] = table_array_of_arrays
 
 
 func _get_unindexing(indexing: Dictionary) -> Array[String]:

@@ -99,7 +99,7 @@ const VERBOSE := true # prints a single line on import
 #  - DB_ENTITIES has 'column_names', 'row_names' & all under 'db style'
 #  - DB_ENTITIES_MOD has above plus 'modifies_table_name'
 #  - DB_ANONYMOUS_ROWS has 'column_names' & all under 'db style'
-#  - ENTITY_X_ENTITY has 'column_names', 'row_names' & all under 'entity x entity'
+#  - ENTITY_X_ENTITY has 'column_names', 'row_names' & all under 'Entity x Entity'
 
 @export var column_names: Array[StringName] # fields if applicable
 @export var row_names: Array[StringName] # entities if applicable
@@ -115,7 +115,7 @@ const VERBOSE := true # prints a single line on import
 @export var db_units: Dictionary[StringName, StringName] # StringNames [field] (FLOAT fields if Unit exists)
 @export var db_import_defaults: Dictionary[StringName, int] # indexed data [field] (if Default exists)
 
-# entity x entity
+# Entity x Entity
 @export var array_of_arrays: Array[Array] # preprocessed data indexed [row_int][column_int]
 @export var exe_type: int
 @export var exe_unit: StringName
