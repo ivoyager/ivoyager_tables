@@ -40,13 +40,14 @@ extends Node
 ##   [field_name][row_int] where row_int can be obtained from
 ##   [member enumerations].[br][br]
 ## 
-## * 'Enum x enum' tables are arrays of arrays and can be indexed by
-##   [row_enum][col_enum]. Swap row & column if table has @TRANSPOSE directive.[br][br]
+## * 'Entity x entity' tables are arrays of arrays and can be indexed by
+##   [row_int][column_int] where row and column ints are entity row numbers
+##   in their defining tables. Swap row & column if table has @TRANSPOSE directive.[br][br]
 ##
 ## For get functions, table is "planets", "moons", etc. (not "planets.tsv", etc.).
 ## In general, functions will throw an error if [param table] doesn't exist
 ## or [param row] is out of range. However, a missing [param field] will not
-## error and will return a "null"-type value: "", &"", NAN, -1 or [].
+## error and will return a "null"-type value ("", &"", NAN, -1, etc.).
 ## This is needed for dictionary and object constructor methods.
 ##
 ## See plugin
@@ -58,9 +59,9 @@ extends Node
 var tables: Dictionary[StringName, Variant] = {}
 ## Indexed by 1st-column entity names from [b]all[/b] 'db-style' tables, which
 ## are required to be globally unique ([method postprocess_tables] will assert
-## if this is not the case). Values are row number integers from the individual tables.
+## if this is not the case). Values are row number from the defining tables.
 var enumerations: Dictionary[StringName, int] = {}
-## Contains 'enum-like' enumerations for each table as a separate dictionary. This
+## Contains 'enum-like' entity enumerations for each table as a separate dictionary. This
 ## dictionary is indexed by table name [i]and[/i] by individual entity (i.e. row) names. You
 ## can use the latter to obtain the full table enumeration given any single table entity name.
 var enumeration_dicts: Dictionary[StringName, Dictionary] = {}

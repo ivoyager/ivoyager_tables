@@ -23,7 +23,7 @@ extends RefCounted
 ## Called by [IVTableData] and [IVTableModding]. Don't use this class directly.
 
 const TableDirectives := IVTableResource.TableDirectives
-const TABLE_ROW_TYPE := IVTableResource.TABLE_ROW_TYPE
+const TYPE_TABLE_ROW := IVTableResource.TYPE_TABLE_ROW
 const ENUM_TYPE_OFFSET := IVTableResource.ENUM_TYPE_OFFSET
 const ARRAY_TYPE_OFFSET := IVTableResource.ARRAY_TYPE_OFFSET
 
@@ -31,6 +31,7 @@ const ARRAY_TYPE_OFFSET := IVTableResource.ARRAY_TYPE_OFFSET
 # TODO: Proper localization. I'm not sure if we're supposed to use get_locale()
 # from OS or TranslationServer, or how to do fallbacks for missing translations.
 var localized_wiki := &"en.wiki"
+
 
 var _tables: Dictionary[StringName, Variant] # postprocessed data indexed [table_name][field_name][row_int]
 var _enumerations: Dictionary[StringName, int] # indexed by ALL entity names (which are globally unique)
@@ -145,8 +146,8 @@ func postprocess(
 				_postprocess_db_entities_mod(table_res)
 			TableDirectives.WIKI_LOOKUP:
 				_postprocess_wiki_lookup(table_res)
-			TableDirectives.ENUM_X_ENUM:
-				_postprocess_enum_x_enum(table_res)
+			TableDirectives.ENTITY_X_ENTITY:
+				_postprocess_entity_x_entity(table_res)
 	
 	# make all containers read-only
 	tables.make_read_only()
@@ -465,7 +466,7 @@ func _postprocess_wiki_lookup(table_res: IVTableResource) -> void:
 		_count += 1
 
 
-func _postprocess_enum_x_enum(table_res: IVTableResource) -> void:
+func _postprocess_entity_x_entity(table_res: IVTableResource) -> void:
 	var table_array_of_arrays: Array[Array] = []
 	var table_name := table_res.table_name
 	var row_names := table_res.row_names
@@ -569,7 +570,7 @@ func _get_postprocess_value(import_str: String, preprocess_type: int, prefix: St
 		assert(!prefix, "Prefix not allowed for COLOR")
 		assert(!unit, "Unit not allowed for COLOR")
 		return _get_postprocess_color(import_str)
-	if preprocess_type == TABLE_ROW_TYPE:
+	if preprocess_type == TYPE_TABLE_ROW:
 		assert(!unit, "Unit not allowed for TABLE_ROW")
 		return _get_postprocess_table_row(import_str, prefix)
 	if preprocess_type >= ARRAY_TYPE_OFFSET: # This is an array of typed data...

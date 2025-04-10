@@ -38,7 +38,7 @@ enum TableDirectives {
 	DB_ANONYMOUS_ROWS,
 	ENUMERATION,
 	WIKI_LOOKUP,
-	ENUM_X_ENUM,
+	ENTITY_X_ENTITY,
 	N_FORMATS,
 	# specific directives
 	MODIFIES,
@@ -50,9 +50,8 @@ enum TableDirectives {
 	DONT_PARSE, # do nothing (for debugging or under-construction table)
 }
 
-
-const TABLE_ROW_TYPE := 999 # >>TYPE_MAX
-const ENUM_TYPE_OFFSET := TABLE_ROW_TYPE + 1 # enums between this and ARRAY_TYPE_OFFSET
+const TYPE_TABLE_ROW := 999 # >>TYPE_MAX
+const ENUM_TYPE_OFFSET := TYPE_TABLE_ROW + 1 # enums between this and ARRAY_TYPE_OFFSET
 const ARRAY_TYPE_OFFSET := ENUM_TYPE_OFFSET * 2
 
 ## Non-array and non-enum preprocess types that are supported.
@@ -66,7 +65,7 @@ const BASE_TYPES: Dictionary[StringName, int] = {
 	&"VECTOR3" : TYPE_VECTOR3,
 	&"VECTOR4" : TYPE_VECTOR4,
 	&"COLOR" : TYPE_COLOR,
-	&"TABLE_ROW" : TABLE_ROW_TYPE,
+	&"TABLE_ROW" : TYPE_TABLE_ROW,
 }
 
 const UNIT_ALLOWED_TYPES: Array[int] = [TYPE_FLOAT, TYPE_VECTOR2, TYPE_VECTOR3, TYPE_VECTOR4,
@@ -100,7 +99,7 @@ const VERBOSE := true # prints a single line on import
 #  - DB_ENTITIES has 'column_names', 'row_names' & all under 'db style'
 #  - DB_ENTITIES_MOD has above plus 'modifies_table_name'
 #  - DB_ANONYMOUS_ROWS has 'column_names' & all under 'db style'
-#  - ENUM_X_ENUM has 'column_names', 'row_names' & all under 'enum x enum'
+#  - ENTITY_X_ENTITY has 'column_names', 'row_names' & all under 'entity x entity'
 
 @export var column_names: Array[StringName] # fields if applicable
 @export var row_names: Array[StringName] # entities if applicable
@@ -116,8 +115,8 @@ const VERBOSE := true # prints a single line on import
 @export var db_units: Dictionary[StringName, StringName] # StringNames [field] (FLOAT fields if Unit exists)
 @export var db_import_defaults: Dictionary[StringName, int] # indexed data [field] (if Default exists)
 
-# enum x enum
-@export var array_of_arrays: Array[Array] # preprocessed data indexed [row_enum][column_enum]
+# entity x entity
+@export var array_of_arrays: Array[Array] # preprocessed data indexed [row_int][column_int]
 @export var exe_type: int
 @export var exe_unit: StringName
 @export var exe_import_default: int
@@ -248,10 +247,10 @@ func import_file(file: FileAccess, source_path: String) -> void:
 			if VERBOSE:
 				print("Importing WIKI_LOOKUP " + path)
 			_preprocess_db_style(cells, false, true, true)
-		TableDirectives.ENUM_X_ENUM:
+		TableDirectives.ENTITY_X_ENTITY:
 			if VERBOSE:
-				print("Importing ENUM_X_ENUM " + path)
-			_preprocess_enum_x_enum(cells)
+				print("Importing ENTITY_X_ENTITY " + path)
+			_preprocess_entity_x_entity(cells)
 
 
 func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_lookup: bool,
@@ -408,7 +407,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 	n_columns = 0 if is_enumeration else dict_of_field_arrays.size()
 
 
-func _preprocess_enum_x_enum(cells: Array[Array]) -> void:
+func _preprocess_entity_x_entity(cells: Array[Array]) -> void:
 	
 	var n_cell_rows := cells.size() # includes column_names
 	var n_cell_columns := cells[0].size() # includes row_names
@@ -505,14 +504,11 @@ func _get_preprocess_type(type_str: StringName) -> int:
 	if type_str.begins_with("ARRAY[") and type_str.ends_with("]"):
 		var array_type_str := type_str.trim_prefix("ARRAY[").trim_suffix("]")
 		assert(!array_type_str.begins_with("ARRAY"), "Nested ARRAY not supported.")
-		
-		# FIXME: Enums
 		var array_type := _get_preprocess_type(array_type_str)
-		
 		return ARRAY_TYPE_OFFSET + array_type
 	
-	# Otherwise, we have to assume it is a valid enum specification. These will
-	# be tested in postprocessing.
+	# Otherwise, we assume it is a valid enum specification. These will be
+	# tested in postprocessing.
 	var enum_index := enum_types.find(type_str)
 	if enum_index == -1:
 		enum_index = enum_types.size()
