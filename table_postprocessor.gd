@@ -60,12 +60,23 @@ func set_modding_tables(modding_table_resources: Dictionary[String, IVTableResou
 
 
 ## Called by IVTableData.
-func postprocess(table_file_paths: Array[String], project_enums: Array[Dictionary],
-		tables: Dictionary, enumerations: Dictionary, enumeration_dicts: Dictionary,
-		enumeration_arrays: Dictionary, table_n_rows: Dictionary, entity_prefixes: Dictionary,
-		wiki_lookup: Dictionary, precisions: Dictionary, enable_wiki: bool, enable_precisions: bool,
-		table_constants: Dictionary, missing_values: Dictionary,
-		unit_conversion_method: Callable, root: Node) -> void:
+func postprocess(
+		table_file_paths: Array[String],
+		tables: Dictionary[StringName, Variant],
+		enumerations: Dictionary[StringName, int],
+		enumeration_dicts: Dictionary[StringName, Dictionary],
+		enumeration_arrays: Dictionary[StringName, Array],
+		table_n_rows: Dictionary[StringName, int],
+		entity_prefixes: Dictionary[StringName, String],
+		wiki_lookup: Dictionary[StringName, String],
+		precisions: Dictionary[StringName, Dictionary],
+		enable_wiki: bool,
+		enable_precisions: bool,
+		table_constants: Dictionary[StringName, Variant],
+		missing_values: Dictionary[int, Variant],
+		unit_conversion_method: Callable,
+		root: Node
+		) -> void:
 	
 	_start_msec = Time.get_ticks_msec()
 	_count = 0
@@ -114,31 +125,8 @@ func postprocess(table_file_paths: Array[String], project_enums: Array[Dictionar
 		else:
 			i += 1
 	
-	# add project enums
-	for project_enum in project_enums:
-		var is_simple_sequential := true # test this
-		i = 0
-		for entity_name: StringName in project_enum:
-			if project_enum[entity_name] != i:
-				is_simple_sequential = false
-				break
-			i += 1
-		var size := project_enum.size()
-		var enum_array: Array[StringName] = []
-		if is_simple_sequential:
-			enum_array.resize(size)
-		for entity_name: StringName in project_enum:
-			assert(!enumerations.has(entity_name), "Table enumerations must be globally unique!")
-			var enumeration: int = project_enum[entity_name]
-			enumerations[entity_name] = enumeration
-			enumeration_dicts[entity_name] = project_enum # needed for ENUM_X_ENUM
-			if is_simple_sequential:
-				enum_array[enumeration] = entity_name
-				enumeration_arrays[entity_name] = enum_array
-	
 	# add/modify table enumerations
 	for table_res in table_resources:
-		
 		match table_res.table_format:
 			TableDirectives.DB_ENTITIES, TableDirectives.ENUMERATION:
 				_add_table_enumeration(table_res)

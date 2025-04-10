@@ -163,31 +163,26 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 ##
 ## To replace default "missing" type values, supply replacements in
 ## [param overwrite_missing_values]. See notes and cautions in [member missing_values].
-func postprocess_tables(table_file_paths: Array,
+func postprocess_tables(
+		table_file_paths: Array[String],
 		unit_conversion_method := placeholder_unit_conversion_method,
-		enable_wiki := false, enable_precisions := false, project_enums := [],
-		merge_overwrite_table_constants := {}, overwrite_missing_values := {}) -> void:
+		enable_wiki := false,
+		enable_precisions := false,
+		merge_overwrite_table_constants: Dictionary[StringName, Variant] = {},
+		merge_overwrite_missing_values: Dictionary[int, Variant] = {}
+	) -> void:
 	
 	table_constants.merge(merge_overwrite_table_constants, true)
-	missing_values.merge(overwrite_missing_values, true)
+	missing_values.merge(merge_overwrite_missing_values, true)
 	assert(missing_values[TYPE_ARRAY] == [], "Don't change missing array value!") # hard-coding!
 	var missing_float: float = missing_values[TYPE_FLOAT]
 	_missing_float_is_nan = is_nan(missing_float)
-	# We type argument arrays here so plugin user doesn't have to...
-	var table_file_paths_: Array[String] = Array(table_file_paths, TYPE_STRING, &"", null)
-	var project_enums_: Array[Dictionary] = Array(project_enums, TYPE_DICTIONARY, &"", null)
-	if is_same(unit_conversion_method, placeholder_unit_conversion_method):
-		# TODO: Make conditional after 'Tables' and 'Units' plugin split...
-		if IVTablesPluginUtils.is_plugin_enabled("ivoyager_units"):
-			var ivqconvert: Script = load("res://addons/ivoyager_units/qconvert.gd")
-			@warning_ignore("unsafe_property_access")
-			unit_conversion_method = ivqconvert.get(&"convert_quantity")
 	
-	table_postprocessor.postprocess(table_file_paths_, project_enums_, tables, enumerations,
+	table_postprocessor.postprocess(table_file_paths, tables, enumerations,
 			enumeration_dicts, enumeration_arrays, table_n_rows, entity_prefixes, wiki_lookup,
 			precisions, enable_wiki, enable_precisions, table_constants, missing_values,
 			unit_conversion_method, get_tree().get_root())
-	table_postprocessor = null
+	table_postprocessor = null # free unreferenced working containers
 
 
 
