@@ -272,7 +272,8 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 	if has_entity_names:
 		table_dict[&"name"] = _enumeration_arrays[table_name]
 	if _enable_precisions:
-		_precisions[table_name] = {}
+		var table_precisions: Dictionary[StringName, Array] = {}
+		_precisions[table_name] = table_precisions
 	
 	for field in column_names:
 		var import_field: Array = dict_of_field_arrays[field]
@@ -307,7 +308,7 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 						_wiki_lookup[row_name] = wiki_title
 		# precisions
 		if _enable_precisions and type == TYPE_FLOAT:
-			var precisions_field := Array([], TYPE_INT, &"", null)
+			var precisions_field: Array[int] = []
 			precisions_field.resize(n_rows)
 			for row in n_rows:
 				
@@ -318,7 +319,8 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 				
 				#var float_string: String = import_field[row]
 				precisions_field[row] = _get_float_str_precision(float_string)
-			_precisions[table_name][field] = precisions_field
+			var table_precisions := _precisions[table_name]
+			table_precisions[field] = precisions_field
 	
 	_db_tables[table_name] = table_dict
 	_table_n_rows[table_name] = n_rows
