@@ -35,8 +35,6 @@ var localized_wiki := &"en.wiki"
 
 var _db_tables: Dictionary[StringName, Dictionary]
 var _exe_tables: Dictionary[StringName, Array]
-
-
 var _enumerations: Dictionary[StringName, int] # indexed by ALL entity names (which are globally unique)
 var _enumeration_dicts: Dictionary[StringName, Dictionary] # indexed by table name & all entity names
 var _enumeration_arrays: Dictionary[StringName, Array] # indexed as above
@@ -155,55 +153,20 @@ func postprocess(
 				_postprocess_entity_x_entity(table_res)
 	
 	# make all containers read-only
-	
-	# TODO: make_read_only_deep()
-	
-	db_tables.make_read_only()
-	exe_tables.make_read_only()
-	enumerations.make_read_only()
-	enumeration_dicts.make_read_only()
-	enumeration_arrays.make_read_only()
-	table_n_rows.make_read_only()
-	entity_prefixes.make_read_only()
-	wiki_lookup.make_read_only()
-	precisions.make_read_only()
-	
-	for table_name in db_tables:
-		var dict_of_field_arrays := db_tables[table_name]
-		dict_of_field_arrays.make_read_only()
-		for field: StringName in dict_of_field_arrays:
-			var field_array: Array = dict_of_field_arrays[field]
-			field_array.make_read_only()
-			if field_array.get_typed_builtin() == TYPE_ARRAY:
-				for array: Array in field_array:
-					array.make_read_only()
-	
-	for table_name in exe_tables:
-		var array_of_arrays: Array[Array] = exe_tables[table_name]
-		array_of_arrays.make_read_only()
-		for array in array_of_arrays:
-			array.make_read_only()
-	
-	for key: StringName in enumeration_dicts:
-		var enumeration_dict: Dictionary = enumeration_dicts[key]
-		enumeration_dict.make_read_only()
-	
-	for key: StringName in enumeration_arrays:
-		var enumeration_array: Array[StringName] = enumeration_arrays[key]
-		enumeration_array.make_read_only()
-	
-	for table_name: StringName in precisions:
-		var dict_of_field_arrays: Dictionary = precisions[table_name]
-		dict_of_field_arrays.make_read_only()
-		for field: StringName in dict_of_field_arrays:
-			var field_array: Array[int] = dict_of_field_arrays[field]
-			field_array.make_read_only()
+	_make_read_only_deep_dict(db_tables)
+	_make_read_only_deep_dict(exe_tables)
+	_make_read_only_deep_dict(enumerations)
+	_make_read_only_deep_dict(enumeration_dicts)
+	_make_read_only_deep_dict(enumeration_arrays)
+	_make_read_only_deep_dict(table_n_rows)
+	_make_read_only_deep_dict(entity_prefixes)
+	_make_read_only_deep_dict(precisions)
 	
 	var msec := Time.get_ticks_msec() - _start_msec
 	print("Processed %s table items in %s msec" % [_count, msec])
 
 
-func c_unescape_patch(text: String) -> String:
+static func c_unescape_patch(text: String) -> String:
 	# Patch method to read '\u' escape; see open Godot issue #38716.
 	# This can read 'small' unicodes up to '\uFFFF'.
 	# Godot doesn't seem to support larger '\Uxxxxxxxx' unicodes as of 4.1.1.
@@ -218,10 +181,36 @@ func c_unescape_patch(text: String) -> String:
 	return text
 
 
+func _make_read_only_deep_dict(dict: Dictionary) -> void:
+	assert(dict.is_typed_key() and dict.is_typed_value()) # all typed here!
+	dict.make_read_only()
+	var value_type := dict.get_typed_value_builtin()
+	if value_type == TYPE_ARRAY:
+		for key: StringName in dict:
+			var value_array: Array = dict[key]
+			_make_read_only_deep_array(value_array)
+	elif value_type == TYPE_DICTIONARY:
+		for key: StringName in dict:
+			var value_dict: Dictionary = dict[key]
+			_make_read_only_deep_dict(value_dict)
+
+
+func _make_read_only_deep_array(array: Array) -> void:
+	assert(array.is_typed()) # all typed here!
+	array.make_read_only()
+	var type := array.get_typed_builtin()
+	if type == TYPE_ARRAY:
+		for value: Array in array:
+			_make_read_only_deep_array(value)
+	elif type == TYPE_DICTIONARY:
+		for value: Dictionary in array:
+			_make_read_only_deep_dict(value)
+
+
 func _add_table_enumeration(table_res: IVTableResource) -> void:
 	var table_name := table_res.table_name
-	var enumeration_dict := {}
 	assert(!_enumeration_dicts.has(table_name), "Duplicate table name")
+	var enumeration_dict: Dictionary[StringName, int] = {}
 	_enumeration_dicts[table_name] = enumeration_dict
 	var row_names := table_res.row_names
 	var enumeration_array: Array[StringName] = row_names.duplicate()
@@ -239,7 +228,7 @@ func _add_table_enumeration(table_res: IVTableResource) -> void:
 func _modify_table_enumeration(table_res: IVTableResource) -> void:
 	var modifies_name := table_res.modifies_table_name
 	assert(_enumeration_dicts.has(modifies_name), "No enumeration for " + modifies_name)
-	var enumeration_dict: Dictionary = _enumeration_dicts[modifies_name]
+	var enumeration_dict: Dictionary[StringName, int] = _enumeration_dicts[modifies_name]
 	var enumeration_array: Array[StringName] = _enumeration_arrays[modifies_name]
 	var row_names := table_res.row_names
 	for row in row_names.size():
@@ -265,7 +254,7 @@ func _postprocess_enumeration(table_res: IVTableResource) -> void:
 
 
 func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -> void:
-	var table_dict := {}
+	var table_dict: Dictionary[StringName, Array] = {}
 	var table_name := table_res.table_name
 	var column_names := table_res.column_names
 	var row_names := table_res.row_names
@@ -278,7 +267,7 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 	var n_rows := table_res.n_rows
 	var unindexing := _get_unindexing(table_res.indexing)
 	
-	var defaults := {} # need for table mods
+	var defaults: Dictionary[StringName, Variant] = {} # need for table mods
 	
 	if has_entity_names:
 		table_dict[&"name"] = _enumeration_arrays[table_name]
@@ -346,11 +335,11 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 	assert(_db_tables.has(modifies_table_name), "Can't modify missing table " + modifies_table_name)
 	assert(_entity_prefixes[modifies_table_name] == table_res.entity_prefix,
 			"Mod table Prefix/<entity_name> header must match modified table")
-	var table_dict: Dictionary = _db_tables[modifies_table_name]
+	var table_dict: Dictionary[StringName, Array] = _db_tables[modifies_table_name]
 	assert(table_dict.has(&"name"), "Modified table must have 'name' field")
-	var defaults: Dictionary = _table_defaults[modifies_table_name]
+	var defaults: Dictionary[StringName, Variant] = _table_defaults[modifies_table_name]
 	var n_rows: int = _table_n_rows[modifies_table_name]
-	var entity_enumeration: Dictionary = _enumeration_dicts[modifies_table_name] # already expanded
+	var entity_enumeration: Dictionary[StringName, int] = _enumeration_dicts[modifies_table_name] # already expanded
 	var n_rows_after_mods := entity_enumeration.size()
 	var mod_column_names := table_res.column_names
 	var mod_row_names := table_res.row_names
@@ -361,7 +350,7 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 	var mod_units := table_res.db_units
 	var mod_n_rows := table_res.n_rows
 	var enum_types := table_res.enum_types
-	var precisions_dict: Dictionary
+	var precisions_dict: Dictionary[StringName, Array]
 	if _enable_precisions:
 		precisions_dict = _precisions[modifies_table_name]
 	var unindexing := _get_unindexing(table_res.indexing)
@@ -496,8 +485,8 @@ func _postprocess_entity_x_entity(table_res: IVTableResource) -> void:
 	
 	assert(_enumeration_dicts.has(row_names[0]), "Unknown enumeration " + row_names[0])
 	assert(_enumeration_dicts.has(column_names[0]), "Unknown enumeration " + column_names[0])
-	var row_enumeration: Dictionary = _enumeration_dicts[row_names[0]]
-	var column_enumeration: Dictionary = _enumeration_dicts[column_names[0]]
+	var row_enumeration: Dictionary[StringName, int] = _enumeration_dicts[row_names[0]]
+	var column_enumeration: Dictionary[StringName, int] = _enumeration_dicts[column_names[0]]
 	
 	var n_rows := row_enumeration.size() # >= import!
 	var n_columns := column_enumeration.size() # >= import!
@@ -529,7 +518,7 @@ func _postprocess_entity_x_entity(table_res: IVTableResource) -> void:
 	_exe_tables[table_name] = table_array_of_arrays
 
 
-func _get_unindexing(indexing: Dictionary) -> Array[String]:
+func _get_unindexing(indexing: Dictionary[String, int]) -> Array[String]:
 	var unindexing: Array[String] = []
 	unindexing.resize(indexing.size())
 	for string: String in indexing:
