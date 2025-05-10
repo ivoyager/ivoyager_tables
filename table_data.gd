@@ -40,21 +40,32 @@ extends Node
 ##   [field_name][row_int] where row_int can be obtained from
 ##   [member enumerations].[br][br]
 ## 
-## * 'Enum x enum' tables are arrays of arrays and can be indexed by
-##   [row_enum][col_enum]. Swap row & column if table has @TRANSPOSE directive.[br][br]
+## * 'Entity x Entity' tables are arrays of arrays and can be indexed by
+##   [row_int][column_int] where row and column ints are entity row numbers
+##   in their defining tables. Swap row & column if table has @TRANSPOSE directive.[br][br]
+##
+## For get functions, table is "planets", "moons", etc. (not "planets.tsv", etc.).
+## In general, functions will throw an error if [param table] doesn't exist
+## or [param row] is out of range. However, a missing [param field] will not
+## error and will return a "null"-type value ("", &"", NAN, -1, etc.).
+## This is needed for dictionary and object constructor methods.
 ##
 ## See plugin
 ## [url=https://github.com/ivoyager/ivoyager_tables/blob/master/README.md]README[/url]
 ## for details.
 
 
-## Contains all postprocessed table data. See class comments for structure.
-var tables: Dictionary[StringName, Variant] = {}
+## Contains all postprocessed data for DB-style tables. Values are dictionaries
+## of field arrays.
+var db_tables: Dictionary[StringName, Dictionary] = {}
+## Contains all postprocessed data for Entity x Entity tables. Values are
+## arrays of arrays.
+var exe_tables: Dictionary[StringName, Array] = {}
 ## Indexed by 1st-column entity names from [b]all[/b] 'db-style' tables, which
 ## are required to be globally unique ([method postprocess_tables] will assert
-## if this is not the case). Values are row number integers from the individual tables.
+## if this is not the case). Values are row number from the defining tables.
 var enumerations: Dictionary[StringName, int] = {}
-## Contains 'enum-like' enumerations for each table as a separate dictionary. This
+## Contains 'enum-like' entity enumerations for each table as a separate dictionary. This
 ## dictionary is indexed by table name [i]and[/i] by individual entity (i.e. row) names. You
 ## can use the latter to obtain the full table enumeration given any single table entity name.
 var enumeration_dicts: Dictionary[StringName, Dictionary] = {}
@@ -74,7 +85,7 @@ var entity_prefixes: Dictionary[StringName, String] = {}
 ## pages, but it should be reconfigurable to link to an internal game wiki.
 var wiki_lookup: Dictionary[StringName, String] = {}
 ## Not populated by default. Set [code]enable_precisions = true[/code] in [method postprocess_tables]
-## to populate. Has nested indexing structure exactly parallel with [member tables] except
+## to populate. Has nested indexing structure exactly parallel with [member db_tables] except
 ## it only has FLOAT columns. Provides significant digits as determined from the table
 ## number text. This is useful only to science geeks making science projects like our
 ## [url=https://github.com/ivoyager/planetarium]Planetarium[/url] (for example).
@@ -109,7 +120,7 @@ var table_constants: Dictionary[StringName, Variant] = {
 ## Use [param overwrite_missing_values] in [method postprocess_tables]
 ## to replace specific missing type values. By default, missing values for the
 ## appropriate types are: false, "", &"", -1, NAN, [], <VectorX or Color>(-INF, -INF,...).
-## Note that a 'missing' value in the file table is exactly equivalent to an empty cell
+## Note that a "missing" value in the file table is exactly equivalent to an empty cell
 ## without Default for the purpose of [method db_has_value] and other methods.
 ## Hence, we avoid potentially valid values such as 0, 0.0, Vector3.ZERO, Color.BLACK, etc.[br][br]
 ##
@@ -155,51 +166,43 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 ## only if the constant type matches the column type. Use this also to overwrite
 ## or disable existing constants in [member table_constants] (use null to disable).[br][br]
 ##
-## To replace default 'missing' type values, supply replacements in
+## To replace default "missing" type values, supply replacements in
 ## [param overwrite_missing_values]. See notes and cautions in [member missing_values].
-func postprocess_tables(table_file_paths: Array,
+func postprocess_tables(
+		table_file_paths: Array[String],
 		unit_conversion_method := placeholder_unit_conversion_method,
-		enable_wiki := false, enable_precisions := false, project_enums := [],
-		merge_overwrite_table_constants := {}, overwrite_missing_values := {}) -> void:
+		enable_wiki := false,
+		enable_precisions := false,
+		merge_overwrite_table_constants: Dictionary[StringName, Variant] = {},
+		merge_overwrite_missing_values: Dictionary[int, Variant] = {}
+	) -> void:
 	
 	table_constants.merge(merge_overwrite_table_constants, true)
-	missing_values.merge(overwrite_missing_values, true)
+	missing_values.merge(merge_overwrite_missing_values, true)
 	assert(missing_values[TYPE_ARRAY] == [], "Don't change missing array value!") # hard-coding!
 	var missing_float: float = missing_values[TYPE_FLOAT]
 	_missing_float_is_nan = is_nan(missing_float)
-	# We type argument arrays here so plugin user doesn't have to...
-	var table_file_paths_: Array[String] = Array(table_file_paths, TYPE_STRING, &"", null)
-	var project_enums_: Array[Dictionary] = Array(project_enums, TYPE_DICTIONARY, &"", null)
-	if is_same(unit_conversion_method, placeholder_unit_conversion_method):
-		# TODO: Make conditional after 'Tables' and 'Units' plugin split...
-		if IVTablesPluginUtils.is_plugin_enabled("ivoyager_units"):
-			var ivqconvert: Script = load("res://addons/ivoyager_units/qconvert.gd")
-			@warning_ignore("unsafe_property_access")
-			unit_conversion_method = ivqconvert.get(&"convert_quantity")
 	
-	table_postprocessor.postprocess(table_file_paths_, project_enums_, tables, enumerations,
+	table_postprocessor.postprocess(table_file_paths,
+			db_tables, 
+			exe_tables,
+			enumerations,
 			enumeration_dicts, enumeration_arrays, table_n_rows, entity_prefixes, wiki_lookup,
 			precisions, enable_wiki, enable_precisions, table_constants, missing_values,
-			unit_conversion_method)
-	table_postprocessor = null
+			unit_conversion_method, get_tree().get_root())
+	table_postprocessor = null # free unreferenced working containers
 
 
-# For get functions below, table is "planets", "moons", etc. Most get functions
-# accept either row (int) or entity (StringName), but not both!
-#
-# In general, functions will throw an error if 'table' or a specified 'entity'
-# is missing or 'row' is out of range. However, a missing 'field' will not
-# error and will return a 'null'-type value: "", &"", NAN, -1 or [].
-# (This is needed for dictionary and object constructor methods.)
 
-## Returns -1 if missing. All entities are globally unique.
+## Returns -1 if missing. "entity" is table row name (1st colum) and is
+## guaranteed to be globally unique.
 func get_row(entity: StringName) -> int:
 	return enumerations.get(entity, -1)
 
 
 ## Returns an enum-like dictionary of row numbers keyed by table name or the 
 ## name of any entity in the table.
-## Works for DB_ENTITIES and ENUMERATION tables and 'project_enums'.
+## Works for DB_ENTITIES and ENUMERATION tables and [param project_enums].
 func get_enumeration_dict(table_or_entity: StringName) -> Dictionary:
 	assert(enumeration_dicts.has(table_or_entity),
 			"Specified table or entity '%s' does not exist or table does not have entity names"
@@ -234,7 +237,7 @@ func get_n_rows(table: StringName) -> int:
 
 
 ## Works for DB_ENTITIES and ENUMERATION tables.
-## Will return "" unless table has header 'Prefix/<entity_prefix>'.
+## Will return "" unless table has header "Prefix/<entity_prefix>".
 func get_entity_prefix(table: StringName) -> String:
 	assert(entity_prefixes.has(table),
 			"Specified table '%s' does not exist" % table)
@@ -248,8 +251,7 @@ func get_entity_prefix(table: StringName) -> String:
 ## Returns &"" if table is DB_ANONYMOUS_ROWS or if row is out of bounds.
 ## Returns entity name for DB_ENTITIES tables only.
 func get_db_entity_name(table: StringName, row: int) -> StringName:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
 	if !enumeration_arrays.has(table):
 		return &""
 	var enumeration_array: Array[StringName] = enumeration_arrays[table]
@@ -261,32 +263,65 @@ func get_db_entity_name(table: StringName, row: int) -> StringName:
 ## Return array is content-typed by field and read-only.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func get_db_field_array(table: StringName, field: StringName) -> Array:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return []
 	return table_dict[field] # read-only
 
 
+## Returns the first row that contains the specified item.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func db_find(table: StringName, field: StringName, value: Variant) -> int:
-	# Returns row number of value in field.
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return -1
 	var field_array: Array = table_dict[field]
 	return field_array.find(value)
 
 
+## Returns the first row that has an array containing the specified item. Field
+## must be an ARRAY type.
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func db_find_in_array(table: StringName, field: StringName, value: Variant) -> int:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
+	if !table_dict.has(field):
+		return -1
+	var field_array: Array = table_dict[field]
+	assert(field_array.get_typed_builtin() == TYPE_ARRAY, "Specified field is not an ARRAY type")
+	for row in field_array.size():
+		var item_array: Array = field_array[row]
+		if item_array.has(value):
+			return row
+	return -1
+
+
+## Searches for value in lookup_field and returns the corresponding (same row)
+## value in return_field. Use &"name" for lookup_field to search by 1st
+## column "entity" name. If value is not found or lookup_field or return_field
+## are not present, return will be return_missing (null if unspecified).
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func db_lookup(table: StringName, lookup_field: StringName, value: Variant,
+		return_field: StringName, return_missing: Variant = null) -> Variant:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
+	if !table_dict.has(lookup_field) or !table_dict.has(return_field):
+		return return_missing
+	var lookup_column: Array = table_dict[lookup_field]
+	var row := lookup_column.find(value)
+	if row == -1:
+		return return_missing
+	var return_column: Array = table_dict[return_field]
+	return return_column[row]
+
+
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func count_db_matching(table: StringName, field: StringName, match_value: Variant) -> int:
 	# Returns -1 if field not found.
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return -1
 	var column_array: Array = table_dict[field]
@@ -296,9 +331,8 @@ func count_db_matching(table: StringName, field: StringName, match_value: Varian
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func get_db_matching_rows(table: StringName, field: StringName, match_value: Variant) -> Array[int]:
 	# May cause error if match_value type differs from field column.
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return [] as Array[int]
 	var column_array: Array = table_dict[field]
@@ -315,9 +349,8 @@ func get_db_matching_rows(table: StringName, field: StringName, match_value: Var
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func get_db_true_rows(table: StringName, field: StringName) -> Array[int]:
 	# Any value that evaluates true in an 'if' statement. Type is not enforced.
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return [] as Array[int]
 	var column_array: Array = table_dict[field]
@@ -332,18 +365,13 @@ func get_db_true_rows(table: StringName, field: StringName) -> Array[int]:
 
 
 ## Returns true if the table has field and does not contain type-specific
-## 'missing' value defined in [member missing_values].
+## "missing" value defined in [member missing_values].
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_has_value(table: StringName, field: StringName, row := -1, entity := &"") -> bool:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func db_has_value(table: StringName, field: StringName, row: int) -> bool:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return false
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	var value: Variant = table_dict[field][row]
 	var type := typeof(value)
 	if type == TYPE_FLOAT and _missing_float_is_nan:
@@ -354,214 +382,147 @@ func db_has_value(table: StringName, field: StringName, row := -1, entity := &""
 
 
 ## Returns true if the table has field and does not contain float-specific
-## 'missing' value defined in [member missing_values] (NAN by default).
+## "missing" value defined in [member missing_values] (NAN by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_has_float_value(table: StringName, field: StringName, row := -1, entity := &"") -> bool:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func db_has_float_value(table: StringName, field: StringName, row: int) -> bool:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return false
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	var float_value: float = table_dict[field][row]
 	if _missing_float_is_nan and is_nan(float_value):
 		return false
 	return float_value != missing_values[TYPE_FLOAT]
 
 
-## Use for STRING field. Returns 'missing' value defined in [member missing_values]
+## Use for STRING field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist ("" by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_string(table: StringName, field: StringName, row := -1, entity := &"") -> String:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_string(table: StringName, field: StringName, row: int) -> String:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_STRING]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for STRING_NAME field. Returns 'missing' value defined in [member missing_values]
+## Use for STRING_NAME field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (&"" by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_string_name(table: StringName, field: StringName, row := -1, entity := &""
-		) -> StringName:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_string_name(table: StringName, field: StringName, row: int) -> StringName:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_STRING_NAME]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for BOOL field. Returns 'missing' value defined in [member missing_values]
+## Use for BOOL field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (false by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_bool(table: StringName, field: StringName, row := -1, entity := &"") -> bool:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_bool(table: StringName, field: StringName, row: int) -> bool:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_BOOL]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for INT field. Returns 'missing' value defined in [member missing_values]
+## Use for INT field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (-1 by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_int(table: StringName, field: StringName, row := -1, entity := &"") -> int:
-	# Use for field Type = INT; returns -1 if missing
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_int(table: StringName, field: StringName, row: int) -> int:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_INT]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for FLOAT field. Returns 'missing' value defined in [member missing_values]
+## Use for FLOAT field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (NAN by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_float(table: StringName, field: StringName, row := -1, entity := &"") -> float:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_float(table: StringName, field: StringName, row: int) -> float:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_FLOAT]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for VECTOR3 field. Returns 'missing' value defined in [member missing_values]
+## Use for VECTOR3 field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (Vector3(-INF,-INF,-INF) by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_vector2(table: StringName, field: StringName, row := -1, entity := &"") -> Vector2:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_vector2(table: StringName, field: StringName, row: int) -> Vector2:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_VECTOR2]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for VECTOR3 field. Returns 'missing' value defined in [member missing_values]
+## Use for VECTOR3 field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (Vector3(-INF,-INF,-INF) by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_vector3(table: StringName, field: StringName, row := -1, entity := &"") -> Vector3:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_vector3(table: StringName, field: StringName, row: int) -> Vector3:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_VECTOR3]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for VECTOR3 field. Returns 'missing' value defined in [member missing_values]
+## Use for VECTOR3 field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (Vector3(-INF,-INF,-INF) by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_vector4(table: StringName, field: StringName, row := -1, entity := &"") -> Vector4:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_vector4(table: StringName, field: StringName, row: int) -> Vector4:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_VECTOR4]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
-## Use for COLOR field. Returns 'missing' value defined in [member missing_values]
+## Use for COLOR field. Returns "missing" value defined in [member missing_values]
 ## if empty cell or field does not exist (Color(-INF,-INF,-INF,-INF) by default).
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_color(table: StringName, field: StringName, row := -1, entity := &"") -> Color:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_color(table: StringName, field: StringName, row: int) -> Color:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return missing_values[TYPE_COLOR]
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
 ## Use for ARRAY[<content_type>] field. Returns an empty typed array if empty cell.
 ## Returns an empty untyped array if field does not exist.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_array(table: StringName, field: StringName, row := -1, entity := &"") -> Array:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var table_dict: Dictionary = tables[table]
+func get_db_array(table: StringName, field: StringName, row: int) -> Array:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	if !table_dict.has(field):
 		return []
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return table_dict[field][row]
 
 
 ## Returns -1 if the field does not exist or is not type FLOAT.
 ## Asserts if [code]enable_precisions = false[/code] (default) in [method postprocess_tables].
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_float_precision(table: StringName, field: StringName, row := -1, entity := &"") -> int:
-	
+func get_db_float_precision(table: StringName, field: StringName, row: int) -> int:
 	assert(precisions.has(table),
 			"No precisions for '%s'; did you set enable_precisions = true?" % table)
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	var precisions_dict: Dictionary = precisions[table]
+	var precisions_dict := precisions[table]
 	if !precisions_dict.has(field):
 		return -1
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	return precisions_dict[field][row]
 
 
 ## Returns the lowest precision in a set of fields. All fields must exist and be type FLOAT.
 ## Asserts if [code]enable_precisions = false[/code] (default) in [method postprocess_tables].
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_least_float_precision(table: StringName, fields: Array[StringName], row := -1,
-		entity := &"") -> int:
+func get_db_least_float_precision(table: StringName, fields: Array[StringName], row: int) -> int:
 	assert(precisions.has(table),
 			"No precisions for '%s'; did you set enable_precisions = true?" % table)
-	assert((row == -1) != (entity == &""), "Requires either row or entity (not both)")
-	if entity:
-		assert(enumerations.has(entity), "Unknown table enumeration '%s'" % entity)
-		row = enumerations[entity]
 	var min_precision := 9999
 	for field in fields:
 		var precission: int = precisions[table][field][row]
@@ -577,7 +538,7 @@ func get_db_least_float_precision(table: StringName, fields: Array[StringName], 
 func get_db_float_precisions(fields: Array[StringName], table: StringName, row: int) -> Array[int]:
 	assert(precisions.has(table),
 			"No precisions for '%s'; did you set enable_precisions = true?" % table)
-	var precisions_dict: Dictionary = precisions[table]
+	var precisions_dict := precisions[table]
 	var n_fields := fields.size()
 	var result: Array[int] = []
 	result.resize(n_fields)
@@ -594,9 +555,8 @@ func get_db_float_precisions(fields: Array[StringName], table: StringName, row: 
 ## Returns an array with a value for each specified field. All fields must exist.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
 func get_db_row_data_array(fields: Array[StringName], table: StringName, row: int) -> Array:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
 	var n_fields := fields.size()
 	var data := []
 	data.resize(n_fields)
@@ -608,82 +568,56 @@ func get_db_row_data_array(fields: Array[StringName], table: StringName, row: in
 	return data
 
 
-## Sets [param dict] key:value pair for every field in [param fields] that has a
-## non-'missing' value in [param table].
+## If [param fields] is specified and non-empty, sets key:value pair in
+## [param dict] for each field in [param fields] that exists in [param table].
+## Otherwise, sets key:value pair for all fields in [param table]. In either
+## case, a "missing" value in table will not be set.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_build_dictionary(dict: Dictionary, fields: Array[StringName], table: StringName, row: int
+func db_build_dictionary(dict: Dictionary, table: StringName, row: int,
+		fields: Array[StringName] = []) -> void:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
+	if fields:
+		for field in fields:
+			if db_has_value(table, field, row):
+				dict[field] = table_dict[field][row]
+		return
+	# all table fields
+	for field: StringName in db_tables[table]:
+		if db_has_value(table, field, row):
+			dict[field] = table_dict[field][row]
+
+
+## If [param fields] is specified and non-empty, sets object property for each
+## field in [param fields] that exists in [param table]. Otherwise, attempts to
+## set object property for all fields in [param table]. In either case, a
+## "missing" value in table will not be set. If object doesn't have specified
+## field name as a property, there is no error and nothing happens for that
+## field.
+## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
+func db_build_object(object: Object, table: StringName, row: int, fields: Array[StringName] = []
 		) -> void:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
-	var n_fields := fields.size()
-	var i := 0
-	while i < n_fields:
-		var field: StringName = fields[i]
-		if db_has_value(table, field, row):
-			dict[field] = table_dict[field][row]
-		i += 1
-
-
-## Sets [param dict] value for each existing dictionary key that exactly matches a column
-## field in [param table]. Missing value in table without Default will not be set.
-## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_build_dictionary_from_keys(dict: Dictionary, table: StringName, row: int) -> void:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	assert(dict, "Expected a dict with keys")
-	var table_dict: Dictionary = tables[table]
-	for field: StringName in dict:
-		if db_has_value(table, field, row):
-			dict[field] = table_dict[field][row]
-
-
-## Sets [param dict] key:value pair for every table field that has a 'non-missing'
-## value or Default.
-## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_build_dictionary_all_fields(dict: Dictionary, table: StringName, row: int) -> void:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
-	for field: StringName in tables[table]:
-		if db_has_value(table, field, row):
-			dict[field] = table_dict[field][row]
-
-
-## Sets object property for each field that exactly matches a field in table.
-## Missing value in table without default will not be set.
-## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_build_object(object: Object, fields: Array[StringName], table: StringName, row: int) -> void:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
-	var n_fields := fields.size()
-	var i := 0
-	while i < n_fields:
-		var field: StringName = fields[i]
-		if db_has_value(table, field, row):
-			object.set(field, table_dict[field][row])
-		i += 1
-
-
-## Sets object property for every table field that has a 'non-missing' value or Default.
-## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_build_object_all_fields(object: Object, table: StringName, row: int) -> void:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	var table_dict: Dictionary = tables[table]
-	for field: StringName in tables[table]:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var table_dict := db_tables[table]
+	if fields:
+		for field in fields:
+			if db_has_value(table, field, row):
+				object.set(field, table_dict[field][row])
+		return
+	# all table fields
+	for field: StringName in db_tables[table]:
 		if db_has_value(table, field, row):
 			object.set(field, table_dict[field][row])
 
 
-## Sets flag if table value evaluates as true in [method get_db_bool]. Does not unset.
+## Sets flag(s) for every key in [param field_flags] that has a corresponding
+## field in [param table] with a true value. The flag(s) to be set are
+## specified by [param field_flags] values. Does not unset.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func db_get_flags(flag_fields: Dictionary, table: StringName, row: int, flags := 0) -> int:
-	assert(tables.has(table), "Specified table '%s' does not exist" % table)
-	assert(typeof(tables[table]) == TYPE_DICTIONARY, "Specified table must be 'DB' format")
-	for flag: int in flag_fields:
-		var field: StringName = flag_fields[flag]
+func db_get_flags(table: StringName, row: int, field_flags: Dictionary[StringName, int]) -> int:
+	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
+	var flags := 0
+	for field in field_flags:
 		if get_db_bool(table, field, row):
-			flags |= flag
+			flags |= field_flags[field]
 	return flags
