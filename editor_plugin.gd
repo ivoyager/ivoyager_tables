@@ -31,7 +31,7 @@ const EditorImportPluginClass := preload("editor_import_plugin.gd")
 
 var _config: ConfigFile # base config with overrides
 var _editor_import_plugin: EditorImportPlugin
-var _autoloads := {}
+var _autoloads: Dictionary[String, String] = {}
 
 
 
@@ -65,8 +65,8 @@ func _add_autoloads() -> void:
 			assert(typeof(value) == TYPE_STRING,
 					"'%s' must specify a path as String" % autoload_name)
 			_autoloads[autoload_name] = value
-	for autoload_name: String in _autoloads:
-		var path: String = _autoloads[autoload_name]
+	for autoload_name in _autoloads:
+		var path := _autoloads[autoload_name]
 		add_autoload_singleton(autoload_name, path)
 
 
