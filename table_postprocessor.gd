@@ -163,7 +163,7 @@ func postprocess(
 	_make_read_only_deep_dict(precisions)
 	
 	var msec := Time.get_ticks_msec() - _start_msec
-	print("Processed %s table items in %s msec" % [_count, msec])
+	print("Processed %s table cells in %s msec" % [_count, msec])
 
 
 static func c_unescape_patch(text: String) -> String:
