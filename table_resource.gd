@@ -37,7 +37,7 @@ enum TableDirectives {
 	DB_ENTITIES_MOD,
 	DB_ANONYMOUS_ROWS,
 	ENUMERATION,
-	WIKI_LOOKUP,
+	WIKI_ONLY,
 	ENTITY_X_ENTITY,
 	N_FORMATS,
 	# specific directives
@@ -95,7 +95,7 @@ const VERBOSE := true # prints a single line on import
 # For vars below, content depends on table format:
 #  - All have 'n_rows' & 'n_columns'
 #  - ENUMERATION has 'row_names' & 'entity_prefix'
-#  - WIKI_LOOKUP has 'column_names', 'row_names' & 'dict_of_field_arrays'
+#  - WIKI_ONLY has 'column_names', 'row_names' & 'dict_of_field_arrays'
 #  - DB_ENTITIES has 'column_names', 'row_names' & all under 'db style'
 #  - DB_ENTITIES_MOD has above plus 'modifies_table_name'
 #  - DB_ANONYMOUS_ROWS has 'column_names' & all under 'db style'
@@ -243,9 +243,9 @@ func import_file(file: FileAccess, source_path: String) -> void:
 			if VERBOSE:
 				print("Importing ENUMERATION " + path)
 			_preprocess_db_style(cells, true, false, true)
-		TableDirectives.WIKI_LOOKUP:
+		TableDirectives.WIKI_ONLY:
 			if VERBOSE:
-				print("Importing WIKI_LOOKUP " + path)
+				print("Importing WIKI_ONLY " + path)
 			_preprocess_db_style(cells, false, true, true)
 		TableDirectives.ENTITY_X_ENTITY:
 			if VERBOSE:
@@ -293,7 +293,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 					path, column])
 			if is_wiki_lookup:
 				assert(field.ends_with(".wiki"),
-						"WIKI_LOOKUP fields must have '.wiki' suffix in %s, 0, %s" % [path, column])
+						"WIKI_ONLY fields must have '.wiki' suffix in %s, 0, %s" % [path, column])
 			column_names.append(field)
 		row += 1
 	
@@ -309,7 +309,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 				assert(!is_enumeration,
 						"Don't use Type in ENUMERATION table %s, %s" % [path, row])
 				assert(!is_wiki_lookup,
-						"Don't use Type in WIKI_LOOKUP table %s, %s" % [path, row])
+						"Don't use Type in WIKI_ONLY table %s, %s" % [path, row])
 				for column: int in skip_column_0_iterator:
 					assert(line_array[column], "Missing Type in %s, %s, %s" % [path, row, column])
 					var field := column_names[column - 1]
@@ -322,7 +322,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 				assert(!is_enumeration,
 						"Don't use Unit in ENUMERATION table %s, %s" % [path, row])
 				assert(!is_wiki_lookup,
-						"Don't use Unit in WIKI_LOOKUP table %s, %s" % [path, row])
+						"Don't use Unit in WIKI_ONLY table %s, %s" % [path, row])
 				for column: int in skip_column_0_iterator:
 					if line_array[column]: # is non-empty
 						var field := column_names[column - 1]
@@ -334,7 +334,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 				assert(!is_enumeration,
 						"Don't use Default in ENUMERATION table %s, %s" % [path, row])
 				assert(!is_wiki_lookup,
-						"Don't use Default in WIKI_LOOKUP table %s, %s" % [path, row])
+						"Don't use Default in WIKI_ONLY table %s, %s" % [path, row])
 				for column: int in skip_column_0_iterator:
 					if line_array[column]: # is non-empty
 						var field := column_names[column - 1]

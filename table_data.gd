@@ -78,11 +78,9 @@ var table_n_rows: Dictionary[StringName, int] = {}
 ## for the 1st column entity names. E.g., in a planets.tsv table with entities
 ## PLANET_MERCURY, PLANET_VENUS, etc., it should be 'PLANET_'.
 var entity_prefixes: Dictionary[StringName, String] = {}
-## Not populated by default. Set [code]enable_wiki = true[/code] in [method postprocess_tables]
-## to populate. Indexed by table 1st-column entity names and provides a wiki 'key' if provided in
-## table (e.g., 'en.wiki' column). This is used by
-## [url=https://github.com/ivoyager/planetarium]Planetarium[/url] to link to Wikipedia.org
-## pages, but it should be reconfigurable to link to an internal game wiki.
+## Not populated by default. Set [code]wiki_field[/code] in [method postprocess_tables]
+## to populate. Indexed by table 1st-column entity names and provides a wiki "key" if provided in
+## table (e.g., &"en.wiki" field). Can be used for external or internal wiki lookup.
 var wiki_lookup: Dictionary[StringName, String] = {}
 ## Not populated by default. Set [code]enable_precisions = true[/code] in [method postprocess_tables]
 ## to populate. Has nested indexing structure exactly parallel with [member db_tables] except
@@ -171,7 +169,7 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 func postprocess_tables(
 		table_file_paths: Array[String],
 		unit_conversion_method := placeholder_unit_conversion_method,
-		enable_wiki := false,
+		wiki_field := &"",
 		enable_precisions := false,
 		merge_overwrite_table_constants: Dictionary[StringName, Variant] = {},
 		merge_overwrite_missing_values: Dictionary[int, Variant] = {}
@@ -183,13 +181,23 @@ func postprocess_tables(
 	var missing_float: float = missing_values[TYPE_FLOAT]
 	_missing_float_is_nan = is_nan(missing_float)
 	
-	table_postprocessor.postprocess(table_file_paths,
+	table_postprocessor.postprocess(
+			table_file_paths,
 			db_tables, 
 			exe_tables,
 			enumerations,
-			enumeration_dicts, enumeration_arrays, table_n_rows, entity_prefixes, wiki_lookup,
-			precisions, enable_wiki, enable_precisions, table_constants, missing_values,
-			unit_conversion_method, get_tree().get_root())
+			enumeration_dicts,
+			enumeration_arrays,
+			table_n_rows,
+			entity_prefixes,
+			wiki_lookup,
+			precisions,
+			wiki_field,
+			enable_precisions,
+			table_constants,
+			missing_values,
+			unit_conversion_method,
+			get_tree().get_root())
 	table_postprocessor = null # free unreferenced working containers
 
 

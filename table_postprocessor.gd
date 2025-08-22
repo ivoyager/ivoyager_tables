@@ -28,11 +28,6 @@ const ENUM_TYPE_OFFSET := IVTableResource.ENUM_TYPE_OFFSET
 const ARRAY_TYPE_OFFSET := IVTableResource.ARRAY_TYPE_OFFSET
 
 
-# TODO: Proper localization. I'm not sure if we're supposed to use get_locale()
-# from OS or TranslationServer, or how to do fallbacks for missing translations.
-var localized_wiki := &"en.wiki"
-
-
 var _db_tables: Dictionary[StringName, Dictionary]
 var _exe_tables: Dictionary[StringName, Array]
 var _enumerations: Dictionary[StringName, int] # indexed by ALL entity names (which are globally unique)
@@ -42,7 +37,7 @@ var _table_n_rows: Dictionary[StringName, int] # indexed by table name
 var _entity_prefixes: Dictionary[StringName, String] # indexed by table name
 var _wiki_lookup: Dictionary[StringName, String] # if enable_wiki;
 var _precisions: Dictionary[StringName, Dictionary] # if enable_precisions
-var _enable_wiki: bool
+var _wiki_field: StringName # e.g., &"en.wiki" (&"" for disabled)
 var _enable_precisions: bool
 var _table_constants: Dictionary[StringName, Variant]
 var _missing_values: Dictionary[int, Variant]
@@ -73,7 +68,7 @@ func postprocess(
 		entity_prefixes: Dictionary[StringName, String],
 		wiki_lookup: Dictionary[StringName, String],
 		precisions: Dictionary[StringName, Dictionary],
-		enable_wiki: bool,
+		wiki_field: StringName,
 		enable_precisions: bool,
 		table_constants: Dictionary[StringName, Variant],
 		missing_values: Dictionary[int, Variant],
@@ -93,7 +88,7 @@ func postprocess(
 	_entity_prefixes = entity_prefixes
 	_wiki_lookup = wiki_lookup
 	_precisions = precisions
-	_enable_wiki = enable_wiki
+	_wiki_field = wiki_field
 	_enable_precisions = enable_precisions
 	_table_constants = table_constants
 	_missing_values = missing_values
@@ -147,7 +142,7 @@ func postprocess(
 				_postprocess_enumeration(table_res)
 			TableDirectives.DB_ENTITIES_MOD:
 				_postprocess_db_entities_mod(table_res)
-			TableDirectives.WIKI_LOOKUP:
+			TableDirectives.WIKI_ONLY:
 				_postprocess_wiki_lookup(table_res)
 			TableDirectives.ENTITY_X_ENTITY:
 				_postprocess_entity_x_entity(table_res)
@@ -298,14 +293,13 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 					enum_types)
 			defaults[field] = default
 		# wiki
-		if field == localized_wiki:
+		if field == _wiki_field:
 			assert(has_entity_names, "Wiki lookup column requires row names")
-			if _enable_wiki:
-				for row in n_rows:
-					var wiki_title: String = new_field[row]
-					if wiki_title:
-						var row_name := row_names[row]
-						_wiki_lookup[row_name] = wiki_title
+			for row in n_rows:
+				var page_title: String = new_field[row]
+				if page_title:
+					var row_name := row_names[row]
+					_wiki_lookup[row_name] = page_title
 		# precisions
 		if _enable_precisions and type == TYPE_FLOAT:
 			var precisions_field: Array[int] = []
@@ -422,9 +416,9 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 			_count += 1
 	
 	# add/overwrite wiki lookup
-	if _enable_wiki:
+	if _wiki_field:
 		for field in mod_column_names:
-			if field != localized_wiki:
+			if field != _wiki_field:
 				continue
 			for mod_row in mod_n_rows:
 				var import_idx: int = mod_dict_of_field_arrays[field][mod_row]
@@ -450,10 +444,10 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 
 func _postprocess_wiki_lookup(table_res: IVTableResource) -> void:
 	# These are NOT added to the 'tables' dictionary!
-	if !_enable_wiki:
+	if !_wiki_field:
 		return
 	var row_names := table_res.row_names
-	var wiki_field: Array[int] = table_res.dict_of_field_arrays[localized_wiki]
+	var wiki_field: Array[int] = table_res.dict_of_field_arrays[_wiki_field]
 	var unindexing := _get_unindexing(table_res.indexing)
 	
 	for row in table_res.row_names.size():

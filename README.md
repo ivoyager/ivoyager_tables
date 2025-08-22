@@ -46,9 +46,9 @@ Postprocessing is called once by the project. The call allows specification of a
 
 ```
 func postprocess_tables(table_file_paths: Array,
-    unit_conversion_method := placeholder_unit_conversion_method,
-    enable_wiki := false, enable_precisions := false, project_enums := [],
-    merge_overwrite_table_constants := {}, overwrite_missing_values := {})
+	unit_conversion_method := placeholder_unit_conversion_method,
+	enable_wiki := false, enable_precisions := false, project_enums := [],
+	merge_overwrite_table_constants := {}, overwrite_missing_values := {})
 ```
 
 The plugin imports table files as a custom resource class, but the resource isn't useful except for table debugging. (Really, everything you need is in IVTableData.)
@@ -63,7 +63,7 @@ We support only tab-delimited files with extension "tsv".
 
 Any line starting with "@" is read as a table directive, which is used to specify one of several table formats and provide additional format-specific instructions. These can be at any line in the file. It may be convenient to include these at the end as many table viewers (including GitHub web pages) assume field names in the top line.
 
-Table format is specified by one of `@DB_ENTITIES` (default), `@DB_ENTITIES_MOD`, `@DB_ANONYMOUS_ROWS`, `@ENUMERATION`, `@WIKI_LOOKUP`, or `@ENUM_X_ENUM`, optionally followed by "=" and then the table name. If omitted, table name is taken from the base file name (e.g., "planets" for "res://path/planets.tsv" file). Several table formats don't need a table format specifier as the importer can figure it out from other clues. Some table formats allow or require additional specific directives. See details in format sections below. (" = " is always ok in place of "=".)
+Table format is specified by one of `@DB_ENTITIES` (default), `@DB_ENTITIES_MOD`, `@DB_ANONYMOUS_ROWS`, `@ENUMERATION`, `@WIKI_ONLY`, or `@ENUM_X_ENUM`, optionally followed by "=" and then the table name. If omitted, table name is taken from the base file name (e.g., "planets" for "res://path/planets.tsv" file). Several table formats don't need a table format specifier as the importer can figure it out from other clues. Some table formats allow or require additional specific directives. See details in format sections below. (" = " is always ok in place of "=".)
 
 For debugging or work-in-progress, you can prevent any imported table from being processed using `@DONT_PARSE`. (It's still technically imported by the editor but won't be parsed line-by-line or handled by the postprocessor.)
 
@@ -179,11 +179,11 @@ This is essentially a DB_ENTITIES format with only the 0-column: it creates enti
 
 As for DB_ENTITIES, you can obtain row_number from the "enumerations" dictionary (index with any entity name) or obtain an enum-like dictionary of entity names from the "enumeration_dicts" dictionary (index with table_name or any entity_name).
 
-## WIKI_LOOKUP Format
+## WIKI_ONLY Format
 
 [Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/solar_system/wiki_extras.tsv)
 
-Required specifier: `@WIKI_LOOKUP[=<table_name>]` (table_name defaults to the base file name)  
+Required specifier: `@WIKI_ONLY[=<table_name>]` (table_name defaults to the base file name)  
 Optional directive: `@DONT_PARSE`
 
 This format can add items to the wiki lookup dictionary that were not added by DB_ENTITIES or DB_ENTITIES_MOD tables.
