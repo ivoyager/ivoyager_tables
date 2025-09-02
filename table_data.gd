@@ -19,9 +19,9 @@
 # *****************************************************************************
 extends Node
 
-## Singleton that provides all interface to data tables.
+## Singleton "IVTableData". Provides all interface to data tables.
 ##
-## This node is added as singleton 'IVTableData'.[br][br]
+## This node is added as singleton "IVTableData".[br][br]
 ##
 ## Data dictionaries are populated only after calling [method postprocess_tables].
 ## Data can be accessed directly in dictionary/array structures or via methods.
@@ -78,10 +78,11 @@ var table_n_rows: Dictionary[StringName, int] = {}
 ## for the 1st column entity names. E.g., in a planets.tsv table with entities
 ## PLANET_MERCURY, PLANET_VENUS, etc., it should be 'PLANET_'.
 var entity_prefixes: Dictionary[StringName, String] = {}
-## Not populated by default. Set [code]wiki_field[/code] in [method postprocess_tables]
-## to populate. Indexed by table 1st-column entity names and provides a wiki "key" if provided in
-## table (e.g., &"en.wiki" field). Can be used for external or internal wiki lookup.
-var wiki_lookup: Dictionary[StringName, String] = {}
+## Not populated by default. Set [param wiki_fields] in [method postprocess_tables]
+## to populate. Indexed by provided wiki_fields. Values are in the form
+## Dictionary[StringName, String] and provide wiki page titles keyed by entity names.
+## Can be used for external or internal wiki lookup.
+var wiki_page_titles_by_field: Dictionary[StringName, Dictionary] ={}
 ## Not populated by default. Set [code]enable_precisions = true[/code] in [method postprocess_tables]
 ## to populate. Has nested indexing structure exactly parallel with [member db_tables] except
 ## it only has FLOAT columns. Provides significant digits as determined from the table
@@ -169,7 +170,7 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 func postprocess_tables(
 		table_file_paths: Array[String],
 		unit_conversion_method := placeholder_unit_conversion_method,
-		wiki_field := &"",
+		wiki_page_title_fields: Array[StringName] = [],
 		enable_precisions := false,
 		merge_overwrite_table_constants: Dictionary[StringName, Variant] = {},
 		merge_overwrite_missing_values: Dictionary[int, Variant] = {}
@@ -190,14 +191,16 @@ func postprocess_tables(
 			enumeration_arrays,
 			table_n_rows,
 			entity_prefixes,
-			wiki_lookup,
+			wiki_page_titles_by_field,
 			precisions,
-			wiki_field,
+			wiki_page_title_fields,
 			enable_precisions,
 			table_constants,
 			missing_values,
 			unit_conversion_method,
-			get_tree().get_root())
+			get_tree().get_root()
+	)
+	
 	table_postprocessor = null # free unreferenced working containers
 
 

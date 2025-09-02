@@ -35,9 +35,9 @@ var _enumeration_dicts: Dictionary[StringName, Dictionary] # indexed by table na
 var _enumeration_arrays: Dictionary[StringName, Array] # indexed as above
 var _table_n_rows: Dictionary[StringName, int] # indexed by table name
 var _entity_prefixes: Dictionary[StringName, String] # indexed by table name
-var _wiki_lookup: Dictionary[StringName, String] # if enable_wiki;
+var _wiki_page_titles_by_field: Dictionary[StringName, Dictionary] = {}
 var _precisions: Dictionary[StringName, Dictionary] # if enable_precisions
-var _wiki_field: StringName # e.g., &"en.wiki" (&"" for disabled)
+var _wiki_fields: Array[StringName]
 var _enable_precisions: bool
 var _table_constants: Dictionary[StringName, Variant]
 var _missing_values: Dictionary[int, Variant]
@@ -66,9 +66,9 @@ func postprocess(
 		enumeration_arrays: Dictionary[StringName, Array],
 		table_n_rows: Dictionary[StringName, int],
 		entity_prefixes: Dictionary[StringName, String],
-		wiki_lookup: Dictionary[StringName, String],
+		wiki_page_titles_by_field: Dictionary[StringName, Dictionary],
 		precisions: Dictionary[StringName, Dictionary],
-		wiki_field: StringName,
+		wiki_fields: Array[StringName],
 		enable_precisions: bool,
 		table_constants: Dictionary[StringName, Variant],
 		missing_values: Dictionary[int, Variant],
@@ -86,9 +86,9 @@ func postprocess(
 	_enumeration_arrays = enumeration_arrays
 	_table_n_rows = table_n_rows
 	_entity_prefixes = entity_prefixes
-	_wiki_lookup = wiki_lookup
+	_wiki_page_titles_by_field = wiki_page_titles_by_field
 	_precisions = precisions
-	_wiki_field = wiki_field
+	_wiki_fields = wiki_fields
 	_enable_precisions = enable_precisions
 	_table_constants = table_constants
 	_missing_values = missing_values
@@ -123,6 +123,10 @@ func postprocess(
 		else:
 			i += 1
 	
+	# prep wiki dicts
+	for wiki_field in wiki_fields:
+		_wiki_page_titles_by_field[wiki_field] = {} as Dictionary[StringName, String]
+	
 	# add/modify table enumerations
 	for table_res in table_resources:
 		match table_res.table_format:
@@ -143,7 +147,7 @@ func postprocess(
 			TableDirectives.DB_ENTITIES_MOD:
 				_postprocess_db_entities_mod(table_res)
 			TableDirectives.WIKI_ONLY:
-				_postprocess_wiki_lookup(table_res)
+				_postprocess_wiki_only(table_res)
 			TableDirectives.ENTITY_X_ENTITY:
 				_postprocess_entity_x_entity(table_res)
 	
@@ -293,13 +297,15 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 					enum_types)
 			defaults[field] = default
 		# wiki
-		if field == _wiki_field:
+		if _wiki_fields.has(field):
 			assert(has_entity_names, "Wiki lookup column requires row names")
+			var wiki_page_titles: Dictionary[StringName, String] = _wiki_page_titles_by_field[field]
 			for row in n_rows:
 				var page_title: String = new_field[row]
 				if page_title:
 					var row_name := row_names[row]
-					_wiki_lookup[row_name] = page_title
+					wiki_page_titles[row_name] = page_title
+		
 		# precisions
 		if _enable_precisions and type == TYPE_FLOAT:
 			var precisions_field: Array[int] = []
@@ -416,17 +422,18 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 			_count += 1
 	
 	# add/overwrite wiki lookup
-	if _wiki_field:
+	if _wiki_fields:
 		for field in mod_column_names:
-			if field != _wiki_field:
+			if !_wiki_fields.has(field):
 				continue
+			var wiki_page_titles: Dictionary[StringName, String] = _wiki_page_titles_by_field[field]
 			for mod_row in mod_n_rows:
 				var import_idx: int = mod_dict_of_field_arrays[field][mod_row]
 				if !import_idx: # 0 is empty
 					continue
 				var import_str: String = unindexing[import_idx]
 				var row_name := mod_row_names[mod_row]
-				_wiki_lookup[row_name] = _get_postprocess_string_name(import_str, "")
+				wiki_page_titles[row_name] = _get_postprocess_string_name(import_str, "")
 	
 	# add/overwrite precisions
 	if _enable_precisions:
@@ -442,22 +449,26 @@ func _postprocess_db_entities_mod(table_res: IVTableResource) -> void:
 				precisions_array[row] = _get_float_str_precision(import_value)
 
 
-func _postprocess_wiki_lookup(table_res: IVTableResource) -> void:
+func _postprocess_wiki_only(table_res: IVTableResource) -> void:
 	# These are NOT added to the 'tables' dictionary!
-	if !_wiki_field:
+	if !_wiki_fields:
 		return
 	var row_names := table_res.row_names
-	var wiki_field: Array[int] = table_res.dict_of_field_arrays[_wiki_field]
+	var dict_of_field_arrays := table_res.dict_of_field_arrays
 	var unindexing := _get_unindexing(table_res.indexing)
-	
-	for row in table_res.row_names.size():
-		var row_name := row_names[row]
-		var import_idx := wiki_field[row]
-		if !import_idx:
+	for wiki_field in _wiki_fields:
+		if !dict_of_field_arrays.has(wiki_field):
 			continue
-		var import_str: String = unindexing[import_idx]
-		_wiki_lookup[row_name] = _get_postprocess_string(import_str, "")
-		_count += 1
+		var wiki_page_titles: Dictionary[StringName, String]= _wiki_page_titles_by_field[wiki_field]
+		var wiki_column: Array[int] = dict_of_field_arrays[wiki_field]
+		for row in row_names.size():
+			var row_name := row_names[row]
+			var import_idx := wiki_column[row]
+			if !import_idx:
+				continue
+			var import_str := unindexing[import_idx]
+			wiki_page_titles[row_name] = _get_postprocess_string(import_str, "")
+			_count += 1
 
 
 func _postprocess_entity_x_entity(table_res: IVTableResource) -> void:

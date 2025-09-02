@@ -9,7 +9,7 @@ File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Developed using Godot 4.5.beta7
 
 ### Changed
-* WIP - Changes to wiki mechanics.
+* [API breaking] Allow specification of multiple wiki fields. These are used to populate dictionary IVTableData.wiki_page_titles_by_field.
 
 ## [v0.0.4] - 2025-06-12
 
