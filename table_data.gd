@@ -205,6 +205,16 @@ func postprocess_tables(
 
 
 
+func has_wiki_page_titles(page_titles_field: StringName) -> bool:
+	return wiki_page_titles_by_field.has(page_titles_field)
+
+
+func get_wiki_page_titles(page_titles_field: StringName) -> Dictionary[StringName, String]:
+	assert(wiki_page_titles_by_field.has(page_titles_field),
+			"Wiki page title fields must be specified in method postprocess_tables()")
+	return wiki_page_titles_by_field[page_titles_field]
+
+
 ## Returns -1 if missing. "entity" is table row name (1st colum) and is
 ## guaranteed to be globally unique.
 func get_row(entity: StringName) -> int:
