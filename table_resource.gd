@@ -253,7 +253,7 @@ func import_file(file: FileAccess, source_path: String) -> void:
 			_preprocess_entity_x_entity(cells)
 
 
-func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_lookup: bool,
+func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_only: bool,
 		has_row_names: bool) -> void:
 	
 	# specific directives
@@ -265,7 +265,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 	db_prefixes = {}
 	if !is_enumeration:
 		dict_of_field_arrays = {}
-		if !is_wiki_lookup:
+		if !is_wiki_only:
 			db_types = {} # indexed by fields
 			db_units = {} # indexed by FLOAT fields
 			db_import_defaults = {} # indexed by fields
@@ -291,9 +291,9 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 					column])
 			assert(!column_names.has(field), "Duplicate field name '%s' in %s, 0, %s" % [field,
 					path, column])
-			if is_wiki_lookup:
-				assert(field.ends_with(".wiki"),
-						"WIKI_ONLY fields must have '.wiki' suffix in %s, 0, %s" % [path, column])
+			#if is_wiki_only:
+				#assert(field.ends_with(".wiki"),
+						#"WIKI_ONLY fields must have '.wiki' suffix in %s, 0, %s" % [path, column])
 			column_names.append(field)
 		row += 1
 	
@@ -308,7 +308,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 			if line_array[0] == "Type":
 				assert(!is_enumeration,
 						"Don't use Type in ENUMERATION table %s, %s" % [path, row])
-				assert(!is_wiki_lookup,
+				assert(!is_wiki_only,
 						"Don't use Type in WIKI_ONLY table %s, %s" % [path, row])
 				for column: int in skip_column_0_iterator:
 					assert(line_array[column], "Missing Type in %s, %s, %s" % [path, row, column])
@@ -321,7 +321,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 			if line_array[0] == "Unit":
 				assert(!is_enumeration,
 						"Don't use Unit in ENUMERATION table %s, %s" % [path, row])
-				assert(!is_wiki_lookup,
+				assert(!is_wiki_only,
 						"Don't use Unit in WIKI_ONLY table %s, %s" % [path, row])
 				for column: int in skip_column_0_iterator:
 					if line_array[column]: # is non-empty
@@ -333,7 +333,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 			if line_array[0] == "Default":
 				assert(!is_enumeration,
 						"Don't use Default in ENUMERATION table %s, %s" % [path, row])
-				assert(!is_wiki_lookup,
+				assert(!is_wiki_only,
 						"Don't use Default in WIKI_ONLY table %s, %s" % [path, row])
 				for column: int in skip_column_0_iterator:
 					if line_array[column]: # is non-empty
@@ -357,7 +357,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_loo
 			
 			# header finished!
 			n_rows = n_cell_rows - row
-			assert(has_types or is_enumeration or is_wiki_lookup,
+			assert(has_types or is_enumeration or is_wiki_only,
 					"Table format requires 'Type' in " + path)
 			for field: StringName in db_units:
 				var type: int = db_types[field]
