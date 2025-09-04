@@ -13,6 +13,7 @@ Developed using Godot 4.5.beta7
 
 ### Changed
 * [API breaking] Allow specification of multiple wiki fields so language can be changed at runtime.
+* [API breaking] Reordered a few function signatures to improve consistency.
 
 ## [v0.0.4] - 2025-06-12
 

@@ -23,32 +23,33 @@ extends Node
 ##
 ## This node is added as singleton "IVTableData".[br][br]
 ##
-## Data dictionaries are populated only after calling [method postprocess_tables].
-## Data can be accessed directly in dictionary/array structures or via methods.
-## All table data is read-only![br][br]
+## Data dictionaries are populated by calling [method postprocess_tables]. Data
+## can be accessed directly in data structures or via methods. All dictionaries
+## and arrays (including nested structures) are fully typed and read-only.[br][br]
 ##
 ## The methods API is useful for object construction and GUI. It has asserts to
-## catch usage and type errors. For very optimized operation, a local reference
-## to a field array is the fastest way to go.  
+## catch usage and type errors. For very optimized operation, direct access will
+## be faster.[br][br]
 ##
-## All postprocessed table data is in dictionary [member tables] indexed by table
-## name (e.g., 'planets', not 'planets.tsv').[br][br]
+## All postprocessed table data is nested within dictionaries [member db_tables]
+## (DB-style tables) and [member exe_tables] (Entity x Entity tables), both indexed
+## by table name (e.g., "planets", not "planets.tsv"). The data structures are as
+## follows:[br][br]
 ##
-## The data structure for individual tables depends on table type:[br][br]
-##
-## * 'DB-style' tables are dictionaries of field arrays and can be indexed by
-##   [field_name][row_int] where row_int can be obtained from
-##   [member enumerations].[br][br]
+## * DB-style tables are dictionaries of field arrays and can be indexed by
+##   [code]db_tables[table_name][field_name][row_int][/code], where row_int can
+##   be obtained from [member enumerations].[br][br]
 ## 
-## * 'Entity x Entity' tables are arrays of arrays and can be indexed by
-##   [row_int][column_int] where row and column ints are entity row numbers
-##   in their defining tables. Swap row & column if table has @TRANSPOSE directive.[br][br]
+## * Entity x Entity tables are arrays of arrays and can be indexed by
+##   [code]exe_tables[table_name][row_int][column_int][/code], where row and
+##   column ints are entity row numbers in their defining tables. Swap row and
+##   column if table has @TRANSPOSE directive.[br][br]
 ##
-## For get functions, table is "planets", "moons", etc. (not "planets.tsv", etc.).
-## In general, functions will throw an error if [param table] doesn't exist
-## or [param row] is out of range. However, a missing [param field] will not
-## error and will return a "null"-type value ("", &"", NAN, -1, etc.).
-## This is needed for dictionary and object constructor methods.
+## For get functions, [param table] is "planets", "moons", etc. (not "planets.tsv",
+## etc.). In general, functions will throw an error if [param table] doesn't exist
+## or [param row] is out of range. However, a missing [param field] or missing
+## cell value (withoud default) will not error and will return a "typed null"
+## value (e.g., "", &"", NAN, -1, etc.) as defined in [member missing_values].[br][br]
 ##
 ## See plugin
 ## [url=https://github.com/ivoyager/ivoyager_tables/blob/master/README.md]README[/url]
@@ -121,9 +122,10 @@ var table_constants: Dictionary[StringName, Variant] = {
 ## appropriate types are: false, "", &"", -1, NAN, [], <VectorX or Color>(-INF, -INF,...).
 ## Note that a "missing" value in the file table is exactly equivalent to an empty cell
 ## without Default for the purpose of [method db_has_value] and other methods.
-## Hence, we avoid potentially valid values such as 0, 0.0, Vector3.ZERO, Color.BLACK, etc.[br][br]
+## This is why it is important not to use potentially valid values (e.g., 0, 0.0,
+## Vector3.ZERO, Color.BLACK, etc.) as "missing" values.[br][br]
 ##
-## WARNING: Don't replace TYPE_ARRAY : []. That's hard-coded!
+## WARNING: Don't replace [code]TYPE_ARRAY : [][/code]. That's hard-coded!
 var missing_values: Dictionary[int, Variant] = {
 	TYPE_BOOL : false,
 	TYPE_STRING : "",
@@ -224,7 +226,7 @@ func get_row(entity: StringName) -> int:
 ## Returns an enum-like dictionary of row numbers keyed by table name or the 
 ## name of any entity in the table.
 ## Works for DB_ENTITIES and ENUMERATION tables and [param project_enums].
-func get_enumeration_dict(table_or_entity: StringName) -> Dictionary:
+func get_enumeration_dict(table_or_entity: StringName) -> Dictionary[StringName, int]:
 	assert(enumeration_dicts.has(table_or_entity),
 			"Specified table or entity '%s' does not exist or table does not have entity names"
 			% table_or_entity)
@@ -246,7 +248,7 @@ func get_enumeration_array(table_or_entity: StringName) -> Array[StringName]:
 func has_entity_name(table: StringName, entity: StringName) -> bool:
 	assert(enumeration_dicts.has(table),
 			"Specified table '%s' does not exist or does not have entity names" % table)
-	var enumeration_dict: Dictionary = enumeration_dicts[table]
+	var enumeration_dict := enumeration_dicts[table]
 	return enumeration_dict.has(entity)
 
 
@@ -556,7 +558,7 @@ func get_db_least_float_precision(table: StringName, fields: Array[StringName], 
 ## non-FLOAT fields are allowed and will have precision -1.
 ## Asserts if [code]enable_precisions = false[/code] (default) in [method postprocess_tables].
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_float_precisions(fields: Array[StringName], table: StringName, row: int) -> Array[int]:
+func get_db_float_precisions(table: StringName, fields: Array[StringName], row: int) -> Array[int]:
 	assert(precisions.has(table),
 			"No precisions for '%s'; did you set enable_precisions = true?" % table)
 	var precisions_dict := precisions[table]
@@ -575,7 +577,7 @@ func get_db_float_precisions(fields: Array[StringName], table: StringName, row: 
 
 ## Returns an array with a value for each specified field. All fields must exist.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_row_data_array(fields: Array[StringName], table: StringName, row: int) -> Array:
+func get_db_row_data_array(table: StringName, fields: Array[StringName], row: int) -> Array:
 	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
 	var table_dict := db_tables[table]
 	var n_fields := fields.size()
