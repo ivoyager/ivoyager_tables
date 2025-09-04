@@ -19,36 +19,37 @@
 # *****************************************************************************
 extends Node
 
-## Singleton that provides all interface to data tables.
+## Singleton "IVTableData". Provides all interface to data tables.
 ##
-## This node is added as singleton 'IVTableData'.[br][br]
+## This node is added as singleton "IVTableData".[br][br]
 ##
-## Data dictionaries are populated only after calling [method postprocess_tables].
-## Data can be accessed directly in dictionary/array structures or via methods.
-## All table data is read-only![br][br]
+## Data dictionaries are populated by calling [method postprocess_tables]. Data
+## can be accessed directly in data structures or via methods. All dictionaries
+## and arrays (including nested structures) are fully typed and read-only.[br][br]
 ##
 ## The methods API is useful for object construction and GUI. It has asserts to
-## catch usage and type errors. For very optimized operation, a local reference
-## to a field array is the fastest way to go.  
+## catch usage and type errors. For very optimized operation, direct access will
+## be faster.[br][br]
 ##
-## All postprocessed table data is in dictionary [member tables] indexed by table
-## name (e.g., 'planets', not 'planets.tsv').[br][br]
+## All postprocessed table data is nested within dictionaries [member db_tables]
+## (DB-style tables) and [member exe_tables] (Entity x Entity tables), both indexed
+## by table name (e.g., "planets", not "planets.tsv"). The data structures are as
+## follows:[br][br]
 ##
-## The data structure for individual tables depends on table type:[br][br]
-##
-## * 'DB-style' tables are dictionaries of field arrays and can be indexed by
-##   [field_name][row_int] where row_int can be obtained from
-##   [member enumerations].[br][br]
+## * DB-style tables are dictionaries of field arrays and can be indexed by
+##   [code]db_tables[table_name][field_name][row_int][/code], where row_int can
+##   be obtained from [member enumerations].[br][br]
 ## 
-## * 'Entity x Entity' tables are arrays of arrays and can be indexed by
-##   [row_int][column_int] where row and column ints are entity row numbers
-##   in their defining tables. Swap row & column if table has @TRANSPOSE directive.[br][br]
+## * Entity x Entity tables are arrays of arrays and can be indexed by
+##   [code]exe_tables[table_name][row_int][column_int][/code], where row and
+##   column ints are entity row numbers in their defining tables. Swap row and
+##   column if table has @TRANSPOSE directive.[br][br]
 ##
-## For get functions, table is "planets", "moons", etc. (not "planets.tsv", etc.).
-## In general, functions will throw an error if [param table] doesn't exist
-## or [param row] is out of range. However, a missing [param field] will not
-## error and will return a "null"-type value ("", &"", NAN, -1, etc.).
-## This is needed for dictionary and object constructor methods.
+## For get functions, [param table] is "planets", "moons", etc. (not "planets.tsv",
+## etc.). In general, functions will throw an error if [param table] doesn't exist
+## or [param row] is out of range. However, a missing [param field] or missing
+## cell value (withoud default) will not error and will return a "typed null"
+## value (e.g., "", &"", NAN, -1, etc.) as defined in [member missing_values].[br][br]
 ##
 ## See plugin
 ## [url=https://github.com/ivoyager/ivoyager_tables/blob/master/README.md]README[/url]
@@ -78,12 +79,11 @@ var table_n_rows: Dictionary[StringName, int] = {}
 ## for the 1st column entity names. E.g., in a planets.tsv table with entities
 ## PLANET_MERCURY, PLANET_VENUS, etc., it should be 'PLANET_'.
 var entity_prefixes: Dictionary[StringName, String] = {}
-## Not populated by default. Set [code]enable_wiki = true[/code] in [method postprocess_tables]
-## to populate. Indexed by table 1st-column entity names and provides a wiki 'key' if provided in
-## table (e.g., 'en.wiki' column). This is used by
-## [url=https://github.com/ivoyager/planetarium]Planetarium[/url] to link to Wikipedia.org
-## pages, but it should be reconfigurable to link to an internal game wiki.
-var wiki_lookup: Dictionary[StringName, String] = {}
+## Not populated by default. Set [param wiki_fields] in [method postprocess_tables]
+## to populate. Indexed by provided wiki_fields. Values are in the form
+## Dictionary[StringName, String] and provide wiki page titles keyed by entity names.
+## Can be used for external or internal wiki lookup.
+var wiki_page_titles_by_field: Dictionary[StringName, Dictionary] ={}
 ## Not populated by default. Set [code]enable_precisions = true[/code] in [method postprocess_tables]
 ## to populate. Has nested indexing structure exactly parallel with [member db_tables] except
 ## it only has FLOAT columns. Provides significant digits as determined from the table
@@ -122,9 +122,10 @@ var table_constants: Dictionary[StringName, Variant] = {
 ## appropriate types are: false, "", &"", -1, NAN, [], <VectorX or Color>(-INF, -INF,...).
 ## Note that a "missing" value in the file table is exactly equivalent to an empty cell
 ## without Default for the purpose of [method db_has_value] and other methods.
-## Hence, we avoid potentially valid values such as 0, 0.0, Vector3.ZERO, Color.BLACK, etc.[br][br]
+## This is why it is important not to use potentially valid values (e.g., 0, 0.0,
+## Vector3.ZERO, Color.BLACK, etc.) as "missing" values.[br][br]
 ##
-## WARNING: Don't replace TYPE_ARRAY : []. That's hard-coded!
+## WARNING: Don't replace [code]TYPE_ARRAY : [][/code]. That's hard-coded!
 var missing_values: Dictionary[int, Variant] = {
 	TYPE_BOOL : false,
 	TYPE_STRING : "",
@@ -171,7 +172,7 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 func postprocess_tables(
 		table_file_paths: Array[String],
 		unit_conversion_method := placeholder_unit_conversion_method,
-		enable_wiki := false,
+		wiki_page_title_fields: Array[StringName] = [],
 		enable_precisions := false,
 		merge_overwrite_table_constants: Dictionary[StringName, Variant] = {},
 		merge_overwrite_missing_values: Dictionary[int, Variant] = {}
@@ -183,15 +184,37 @@ func postprocess_tables(
 	var missing_float: float = missing_values[TYPE_FLOAT]
 	_missing_float_is_nan = is_nan(missing_float)
 	
-	table_postprocessor.postprocess(table_file_paths,
+	table_postprocessor.postprocess(
+			table_file_paths,
 			db_tables, 
 			exe_tables,
 			enumerations,
-			enumeration_dicts, enumeration_arrays, table_n_rows, entity_prefixes, wiki_lookup,
-			precisions, enable_wiki, enable_precisions, table_constants, missing_values,
-			unit_conversion_method, get_tree().get_root())
+			enumeration_dicts,
+			enumeration_arrays,
+			table_n_rows,
+			entity_prefixes,
+			wiki_page_titles_by_field,
+			precisions,
+			wiki_page_title_fields,
+			enable_precisions,
+			table_constants,
+			missing_values,
+			unit_conversion_method,
+			get_tree().get_root()
+	)
+	
 	table_postprocessor = null # free unreferenced working containers
 
+
+
+func has_wiki_page_titles(page_titles_field: StringName) -> bool:
+	return wiki_page_titles_by_field.has(page_titles_field)
+
+
+func get_wiki_page_titles(page_titles_field: StringName) -> Dictionary[StringName, String]:
+	assert(wiki_page_titles_by_field.has(page_titles_field),
+			"Wiki page title fields must be specified in method postprocess_tables()")
+	return wiki_page_titles_by_field[page_titles_field]
 
 
 ## Returns -1 if missing. "entity" is table row name (1st colum) and is
@@ -203,7 +226,7 @@ func get_row(entity: StringName) -> int:
 ## Returns an enum-like dictionary of row numbers keyed by table name or the 
 ## name of any entity in the table.
 ## Works for DB_ENTITIES and ENUMERATION tables and [param project_enums].
-func get_enumeration_dict(table_or_entity: StringName) -> Dictionary:
+func get_enumeration_dict(table_or_entity: StringName) -> Dictionary[StringName, int]:
 	assert(enumeration_dicts.has(table_or_entity),
 			"Specified table or entity '%s' does not exist or table does not have entity names"
 			% table_or_entity)
@@ -225,7 +248,7 @@ func get_enumeration_array(table_or_entity: StringName) -> Array[StringName]:
 func has_entity_name(table: StringName, entity: StringName) -> bool:
 	assert(enumeration_dicts.has(table),
 			"Specified table '%s' does not exist or does not have entity names" % table)
-	var enumeration_dict: Dictionary = enumeration_dicts[table]
+	var enumeration_dict := enumeration_dicts[table]
 	return enumeration_dict.has(entity)
 
 
@@ -535,7 +558,7 @@ func get_db_least_float_precision(table: StringName, fields: Array[StringName], 
 ## non-FLOAT fields are allowed and will have precision -1.
 ## Asserts if [code]enable_precisions = false[/code] (default) in [method postprocess_tables].
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_float_precisions(fields: Array[StringName], table: StringName, row: int) -> Array[int]:
+func get_db_float_precisions(table: StringName, fields: Array[StringName], row: int) -> Array[int]:
 	assert(precisions.has(table),
 			"No precisions for '%s'; did you set enable_precisions = true?" % table)
 	var precisions_dict := precisions[table]
@@ -554,7 +577,7 @@ func get_db_float_precisions(fields: Array[StringName], table: StringName, row: 
 
 ## Returns an array with a value for each specified field. All fields must exist.
 ## Works for DB_ENTITIES and DB_ANONYMOUS_ROWS tables.
-func get_db_row_data_array(fields: Array[StringName], table: StringName, row: int) -> Array:
+func get_db_row_data_array(table: StringName, fields: Array[StringName], row: int) -> Array:
 	assert(db_tables.has(table), "Specified table '%s' does not exist" % table)
 	var table_dict := db_tables[table]
 	var n_fields := fields.size()
