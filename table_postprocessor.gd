@@ -624,7 +624,7 @@ func _get_postprocess_float(import_str: String, unit: StringName) -> float:
 			unit_split[0], float_str])
 	var import_float := float_str.to_float()
 	if unit:
-		return _unit_conversion_method.call(import_float, unit, true, true)
+		return _unit_conversion_method.call(import_float, unit, true)
 	return import_float
 
 

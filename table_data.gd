@@ -145,7 +145,7 @@ var table_postprocessor := IVTablePostprocessor.new()
 ## Placeholder method. Will assert an error if any table file has units and user
 ## did not supply [param unit_conversion_method].
 static var placeholder_unit_conversion_method := func(_x: float, _unit: StringName,
-		 _to_internal: bool, _parse_compound_unit: bool) -> float:
+		 _parse_compound_unit: bool) -> float:
 	assert(false, "Unit in table but no unit_conversion_method specified in postprocess_tables()")
 	return NAN
 
@@ -157,7 +157,7 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 ##
 ## If float units are used in any table file you MUST specify
 ## [param unit_conversion_method]. If using I, Voyager's 'Units' plugin, the
-## Callable to supply is IVQConvert.convert_quantity.[br][br]
+## Callable to supply is IVQConvert.internalize_quantity.[br][br]
 ##
 ## To use enum constants in table file INT columns, include the enums in
 ## [param project_enums].[br][br]
