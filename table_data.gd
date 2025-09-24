@@ -157,7 +157,7 @@ var _missing_float_is_nan := true # requires special handling since NAN != NAN
 ##
 ## If float units are used in any table file you MUST specify
 ## [param unit_conversion_method]. If using I, Voyager's 'Units' plugin, the
-## Callable to supply is IVQConvert.internalize_quantity.[br][br]
+## Callable to supply is IVQConvert.to_internal.[br][br]
 ##
 ## To use enum constants in table file INT columns, include the enums in
 ## [param project_enums].[br][br]
