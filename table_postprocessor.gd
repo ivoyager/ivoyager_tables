@@ -140,7 +140,7 @@ func postprocess(
 		match table_res.table_format:
 			TableDirectives.DB_ENTITIES:
 				_postprocess_db_table(table_res, true)
-			TableDirectives.DB_ANONYMOUS_ROWS:
+			TableDirectives.DB_ANONYMOUS:
 				_postprocess_db_table(table_res, false)
 			TableDirectives.ENUMERATION:
 				_postprocess_enumeration(table_res)

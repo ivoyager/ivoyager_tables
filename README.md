@@ -56,7 +56,7 @@ We support only tab-delimited files with extension "tsv".
 
 Any line starting with "@" is read as a table directive, which is used to specify one of several table formats and provide additional format-specific instructions. These can be at any line in the file. It may be convenient to include these at the end as many table viewers (including GitHub web pages) assume field names in the top line.
 
-Table format is specified by one of `@DB_ENTITIES` (default), `@DB_ENTITIES_MOD`, `@DB_ANONYMOUS_ROWS`, `@ENUMERATION`, `@WIKI_ONLY`, or `@ENTITY_X_ENTITY`, optionally followed by "=" and then the table name. If omitted, table name is taken from the base file name (e.g., "planets" for "res://path/planets.tsv" file). Several table formats don't need a table format specifier as the importer can figure it out from other clues. Some table formats allow or require additional specific directives. See details in format sections below.
+Table format is specified by one of `@DB_ENTITIES` (default), `@DB_ENTITIES_MOD`, `@DB_ANONYMOUS`, `@ENUMERATION`, `@WIKI_ONLY`, or `@ENTITY_X_ENTITY`, optionally followed by "=" and then the table name. If omitted, table name is taken from the base file name (e.g., "planets" for "res://path/planets.tsv" file). Several table formats don't need a table format specifier as the importer can figure it out from other clues. Some table formats allow or require additional specific directives. See details in format sections below.
 
 For debugging or work-in-progress, you can prevent any imported table from being processed using `@DONT_PARSE`. (It's still technically imported by the editor but won't be parsed line-by-line or handled by the postprocessor.)
 
@@ -153,11 +153,11 @@ This table modifies an existing DB_ENTITIES table. It can add entities or fields
 
 Rules exactly follow DB_ENTITIES except that entity names _must_ be present and they _may or may not already exist_ in the DB_ENTITIES table being modified. If an entity name already exists, the mod table data will overwrite existing values. Otherwise, a new entity/row is added to the existing table. Similarly, field names may or may not already exist. If a new field/column is specified, then all previously existing entities (that are absent in the mod table) will be assigned the default value for this field.
 
-## DB_ANONYMOUS_ROWS Format
+## DB_ANONYMOUS Format
 
 [Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/file_adjustments.tsv)
 
-Optional specifier: `@DB_ANONYMOUS_ROWS[=<table_name>]` (table_name defaults to the base file name)   
+Optional specifier: `@DB_ANONYMOUS[=<table_name>]` (table_name defaults to the base file name)   
 Optional directive: `@DONT_PARSE`
 
 This table is exactly like [DB_ENTITIES](#DB_ENTITIES-Format) except that row names (the first column of each content row) are empty. The importer can identify this situation without the specifier directive. (Inconsistent use of row names will cause an import error assert.) This table will not create entity enumerations and does not have a "name" field and cannot be modified by DB_ENTITIES_MOD, but is in other ways like DB_ENTITIES.
