@@ -140,7 +140,7 @@ func postprocess(
 		match table_res.table_format:
 			TableDirectives.DB_ENTITIES:
 				_postprocess_db_table(table_res, true)
-			TableDirectives.DB_ANONYMOUS_ROWS:
+			TableDirectives.DB_ANONYMOUS:
 				_postprocess_db_table(table_res, false)
 			TableDirectives.ENUMERATION:
 				_postprocess_enumeration(table_res)
@@ -311,13 +311,8 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 			var precisions_field: Array[int] = []
 			precisions_field.resize(n_rows)
 			for row in n_rows:
-				
-				
 				var index: int = import_field[row]
 				var float_string: String = unindexing[index]
-				
-				
-				#var float_string: String = import_field[row]
 				precisions_field[row] = _get_float_str_precision(float_string)
 			var table_precisions := _precisions[table_name]
 			table_precisions[field] = precisions_field
@@ -604,6 +599,8 @@ func _get_postprocess_bool(import_str: String) -> bool:
 
 
 func _get_postprocess_float(import_str: String, unit: StringName) -> float:
+	const ORD_E := ord("E")
+	const ORD_e := ord("e")
 	import_str = import_str.strip_edges() # delimited sub-elements may have spaces
 	if !import_str:
 		return _missing_values[TYPE_FLOAT]
@@ -618,13 +615,13 @@ func _get_postprocess_float(import_str: String, unit: StringName) -> float:
 			unit_split[1] = "1/" + unit_split[1]
 	if unit_split.size() == 2:
 		unit = StringName(unit_split[1]) # overrides column unit!
-	var float_str := unit_split[0].lstrip("~").replace("E", "e").replace("_", "").replace(",", "")
+	var float_str := unit_split[0].remove_chars(",_").replace_char(ORD_E, ORD_e).lstrip("~")
 	assert(float_str.is_valid_float(), 
 			"Invalid FLOAT! Before / after postprocessing: '%s' / '%s'" % [
 			unit_split[0], float_str])
 	var import_float := float_str.to_float()
 	if unit:
-		return _unit_conversion_method.call(import_float, unit, true, true)
+		return _unit_conversion_method.call(import_float, unit, true)
 	return import_float
 
 
@@ -899,6 +896,10 @@ func _get_float_str_precision(float_str: String) -> int:
 	# We ignore an inline unit, if present.
 	# We ignore leading zeroes.
 	# We count trailing zeroes IF AND ONLY IF the number has a decimal place.
+	const ORD_E := ord("E")
+	const ORD_e := ord("e")
+	const ORD_DECIMAL := ord(".")
+	
 	if !float_str:
 		return -1
 	if typeof(_table_constants.get(float_str)) == TYPE_FLOAT:
@@ -912,37 +913,22 @@ func _get_float_str_precision(float_str: String) -> int:
 	if float_str.begins_with("~"):
 		return 0 # in Planetarium GUI we display these as, e.g., '~1 km'
 	
-	# replicate postprocessing string changes
+	# remove unit string if present
 	var unit_split := float_str.split(" ", false, 1)
 	unit_split = unit_split[0].split("/", false, 1)
 	float_str = unit_split[0]
-	float_str = float_str.replace("E", "e").replace("_", "").replace(",", "")
 	
-	# calculate precision
-	var length := float_str.length()
-	var n_digits := 0
-	var started := false
-	var n_unsig_zeros := 0
-	var deduct_zeroes := true
-	var i := 0
-	while i < length:
-		var chr: String = float_str[i]
-		if chr == ".":
-			started = true
-			deduct_zeroes = false
-		elif chr == "e":
-			break
-		elif chr == "0":
-			if started:
-				n_digits += 1
-				if deduct_zeroes:
-					n_unsig_zeros += 1
-		elif chr != "-":
-			assert(chr.is_valid_int(), "Unknown FLOAT character '%s' in %s" % [chr, float_str])
-			started = true
-			n_digits += 1
-			n_unsig_zeros = 0
-		i += 1
-	if deduct_zeroes:
-		n_digits -= n_unsig_zeros
-	return n_digits
+	# standardize
+	float_str = float_str.remove_chars(",_").replace_char(ORD_E, ORD_e)
+	
+	# deconstruct the number
+	var exp_pos := float_str.find("e")
+	if exp_pos > -1:
+		float_str = float_str.substr(0, exp_pos)
+	float_str = float_str.remove_char(ORD_DECIMAL).lstrip("-+")
+	assert(float_str.is_valid_int(), "Unexpected character(s) in float string")
+	var count_w_leading_zeros := float_str.length()
+	float_str = float_str.lstrip("0") # strip leading zeros (after decimal removal)
+	if !float_str:
+		return count_w_leading_zeros # float_str was "0", "0.0", etc., before decimal removal
+	return float_str.length()

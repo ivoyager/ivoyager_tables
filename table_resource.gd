@@ -35,7 +35,7 @@ enum TableDirectives {
 	# table formats
 	DB_ENTITIES,
 	DB_ENTITIES_MOD,
-	DB_ANONYMOUS_ROWS,
+	DB_ANONYMOUS,
 	ENUMERATION,
 	WIKI_ONLY,
 	ENTITY_X_ENTITY,
@@ -98,7 +98,7 @@ const VERBOSE := true # prints a single line on import
 #  - WIKI_ONLY has 'column_names', 'row_names' & 'dict_of_field_arrays'
 #  - DB_ENTITIES has 'column_names', 'row_names' & all under 'db style'
 #  - DB_ENTITIES_MOD has above plus 'modifies_table_name'
-#  - DB_ANONYMOUS_ROWS has 'column_names' & all under 'db style'
+#  - DB_ANONYMOUS has 'column_names' & all under 'db style'
 #  - ENTITY_X_ENTITY has 'column_names', 'row_names' & all under 'Entity x Entity'
 
 @export var column_names: Array[StringName] # fields if applicable
@@ -212,7 +212,7 @@ func import_file(file: FileAccess, source_path: String) -> void:
 		elif cells[-1][0]: # last row name (we expect all or none, and test this below)
 			table_format = TableDirectives.DB_ENTITIES
 		else:
-			table_format = TableDirectives.DB_ANONYMOUS_ROWS
+			table_format = TableDirectives.DB_ANONYMOUS
 	if !table_name:
 		table_name = StringName(path.get_file().get_basename())
 	
@@ -235,9 +235,9 @@ func import_file(file: FileAccess, source_path: String) -> void:
 			if VERBOSE:
 				print("Importing DB_ENTITIES_MOD " + path)
 			_preprocess_db_style(cells, false, false, true)
-		TableDirectives.DB_ANONYMOUS_ROWS:
+		TableDirectives.DB_ANONYMOUS:
 			if VERBOSE:
-				print("Importing DB_ANONYMOUS_ROWS " + path)
+				print("Importing DB_ANONYMOUS " + path)
 			_preprocess_db_style(cells, false, false, false)
 		TableDirectives.ENUMERATION:
 			if VERBOSE:
@@ -379,7 +379,7 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_onl
 			assert(line_array[0], "Missing expected row name in %s, %s" % [path, row])
 		else:
 			assert(!line_array[0],
-					"DB_ANONYMOUS_ROWS table has row name in %s, %s" % [path, row])
+					"DB_ANONYMOUS table has row name in %s, %s" % [path, row])
 		
 		if has_row_names:
 			var row_name := StringName(entity_prefix + line_array[0])
