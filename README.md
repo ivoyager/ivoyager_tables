@@ -1,6 +1,6 @@
 # I, Voyager - Tables
 
-TL;DR: This Godot Editor plugin imports tables like [this](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/planets.tsv) and provides access to processed, statically typed data. It can impute defaults, convert floats by specified units, prefix text, convert text enumerations to integers, and much more! 
+TL;DR: This Godot Editor plugin imports tables like [this](https://github.com/ivoyager/ivoyager_core/blob/master/tables/planets.tsv) and provides access to processed, statically typed data. It can impute defaults, convert floats by specified units, prefix text, convert text enumerations to integers, and much more! 
 
 This plugin works best in combination with our [Units plugin](https://github.com/ivoyager/ivoyager_units). You can use it without that plugin, but you will need to supply your own unit coversion method to use any units functionality.
 
@@ -28,7 +28,7 @@ Table features:
 * Specification of data **Default** to reduce table clutter. Cells that are a common default value can be left empty.
 * Specification of data **Prefix** to reduce enumeration text size. E.g., skip redundant prefix text in PLANET_MERCURY, PLANET_VENUS, etc..
 * Specification of float **Unit** so file data can be entered in the most convenient units while maintaining consistent internal representation. Unit can be specified for a whole float column or within a float cell (e.g., "1000 d" or "1000/d"). Conversion is provided by our [Units plugin](https://github.com/ivoyager/ivoyager_units), or, alternatively, by a project-supplied conversion Callable. Our Units plugin knows SI units and many others, and can parse arbitrary compound units like "m^3/(kg s^2)".
-* Table **enumerations** that may reference project or Godot enums _**or**_ table-defined entity names. For example, in our project, "PLANET_EARTH" resolves to 3 (in columns of type TABLE_ROW) _in any table_ because "PLANET_EARTH" is row 3 in [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/planets.tsv).
+* Table **enumerations** that may reference project or Godot enums _**or**_ table-defined entity names. For example, in our project, "PLANET_EARTH" resolves to 3 (in columns of type TABLE_ROW) _in any table_ because "PLANET_EARTH" is row 3 in [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/tables/planets.tsv).
 * Table **constants** that can be used in columns of any type. This is how the plugin handles things like "TRUE" and "-Inf" but also can be used to add arbitrary constants like "MARS_PERIHELION" or "SOME_LARGE_TEXT_ITEM" if needed.
 * Tables that modify other tables.
 * **Modding support** that allows your game or project users to replace base tables with modded tables (e.g., in a user directory: user://modding/mod_files/).
@@ -81,7 +81,7 @@ Type is specified by column field for "db-style" format or for the whole table f
 * `VECTOR2`, `VECTOR3`, `VECTOR4` - Enter in table cell as a comma-delimited set of 2, 3 or 4 float values. All rules for floats above apply except vector elements cannot have commas. Empty cells will be imputed with default value (if specified) or VectorX(-INF, -INF,...).
 * `COLOR` - Cell content is interpretted in a sensible way. Valid representations of red include: "red", "ff0000", "red, 1.0", "1, 0, 0" and "1, 0, 0, 1". Empty cells will be imputed with default value (if specified) or Color(-INF, -INF, -INF, -INF).
 * `INT` - A valid integer. Empty cells will be imputed with default value (if specified) or -1.
-* `TABLE_ROW` - An entity name as an integer enumeration. The entity name can be from _any_ db-style table included in the `postprocess_tables()` call. E.g., "PLANET_EARTH" in our [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/planets.tsv) would evaluate to 3 because it is row three. Note that table entity names are globally unique (this is enforced). The internal postprocessed data type will be `int`. Empty cells will be imputed with default value (if specified) or -1.
+* `TABLE_ROW` - An entity name as an integer enumeration. The entity name can be from _any_ db-style table included in the `postprocess_tables()` call. E.g., "PLANET_EARTH" in our [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/tables/planets.tsv) would evaluate to 3 because it is row three. Note that table entity names are globally unique (this is enforced). The internal postprocessed data type will be `int`. Empty cells will be imputed with default value (if specified) or -1.
 * `<ClassName>.<EnumName>` or `<Class>` - For specifying project or Godot enums. Class and EnumName are needed for project enums (where Class can be the name of a singleton). For Godot classes, EnumName can optionally be omitted. The internal postprocessed data type will be `int`. Empty cells will be imputed with default value (if specified) or -1.
 * `ARRAY[xxxx]` (where "xxxx" specifies element type and is any of the above type strings) - Array elements are expected to be delimited by semicolon (;). After splitting by semicolon, each element is interpreted exactly as its type above. Column `Unit` and `Prefix`, if specified, are applied element-wise. Empty cells will be imputed with default value (if specified) or an empty, typed array.
 
@@ -112,7 +112,7 @@ Most .csv/.tsv file editors will "interpret" and change (i.e., corrupt) table da
 
 ## DB_ENTITIES Format
 
-[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/planets.tsv)
+[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/tables/planets.tsv)
 
 Optional specifier: `@DB_ENTITIES[=<table_name>]` (table_name defaults to the base file name)  
 Optional directive: `@DONT_PARSE`
@@ -129,7 +129,7 @@ After field names and before data, tables can have the following header rows in 
 * `Type` (required): See data types above.
 * `Default` (optional): Default values must be empty or follow Type rules above. If non-empty, this value is imputed for any empty cells in the column.
 * `Unit` (optional; FLOAT and ARRAY[FLOAT] fields only): This is supported if our [Units pluging](https://github.com/ivoyager/ivoyager_units) is also active, or if the project supplies its own unit conversion Callable. Our Units plugin supports SI and other units, and can parse arbitrary compound units like "m^3/(kg s^2)".
-* `Prefix` (optional; STRING, STRING_NAME, TABLE_ROW, and <ClassName>.<EnumName> fields only, or ARRAY[xxxx] of any preceding type): Prefixes any non-empty cells and `Default` (if specified) with provided prefix text. To prefix the column 0 implicit "name" field, use `Prefix/<entity prefix>`. E.g., we use `Prefix/PLANET_` in [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/planets.tsv) to prefix all entity names with "PLANET_".
+* `Prefix` (optional; STRING, STRING_NAME, TABLE_ROW, and <ClassName>.<EnumName> fields only, or ARRAY[xxxx] of any preceding type): Prefixes any non-empty cells and `Default` (if specified) with provided prefix text. To prefix the column 0 implicit "name" field, use `Prefix/<entity prefix>`. E.g., we use `Prefix/PLANET_` in [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/tables/planets.tsv) to prefix all entity names with "PLANET_".
 
 #### Entity Names
 
@@ -143,7 +143,7 @@ For example usage, our [Planetarium](https://www.ivoyager.dev/planetarium/) spec
 
 ## DB_ENTITIES_MOD Format
 
-[Example Table](https://github.com/t2civ/astropolis_sdk/blob/master/public/data/tables/planets_mod.tsv)
+[Example Table](https://github.com/t2civ/astropolis_sdk/blob/master/public/tables/planets_mod.tsv)
 
 Optional specifier: `@DB_ENTITIES_MOD[=<table_name>]` (table_name defaults to the base file name)  
 Required directive: `@MODIFIES=<table_name>`  
@@ -155,7 +155,7 @@ Rules exactly follow DB_ENTITIES except that entity names _must_ be present and 
 
 ## DB_ANONYMOUS Format
 
-[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/file_adjustments.tsv)
+[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/tables/file_adjustments.tsv)
 
 Optional specifier: `@DB_ANONYMOUS[=<table_name>]` (table_name defaults to the base file name)   
 Optional directive: `@DONT_PARSE`
@@ -164,7 +164,7 @@ This table is exactly like [DB_ENTITIES](#DB_ENTITIES-Format) except that row na
 
 ## ENUMERATION Format
 
-[Example Table](https://github.com/t2civ/astropolis_public/blob/master/data/tables/major_strata.tsv)
+[Example Table](https://github.com/t2civ/astropolis_public/blob/master/tables/major_strata.tsv)
 
 Optional specifier: `@ENUMERATION[=<table_name>]` (table_name defaults to the base file name)  
 Optional directive: `@DONT_PARSE`
@@ -177,7 +177,7 @@ See [Entity Names](#Entity-Names) in the DB_ENTITIES Format above.
 
 ## WIKI_ONLY Format
 
-[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/data/tables/wiki_extras.tsv)
+[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/tables/wiki_extras.tsv)
 
 Required specifier: `@WIKI_ONLY[=<table_name>]` (table_name defaults to the base file name)  
 Optional directive: `@DONT_PARSE`
@@ -192,7 +192,7 @@ For example usage, our [Planetarium](https://www.ivoyager.dev/planetarium/) uses
 
 ## ENTITY_X_ENTITY Format
 
-[Example Table](https://github.com/t2civ/astropolis_sdk/blob/master/public/data/tables/compositions_resources_proportions.tsv)
+[Example Table](https://github.com/t2civ/astropolis_sdk/blob/master/public/tables/compositions_resources_proportions.tsv)
 
 Required specifier: `@ENTITY_X_ENTITY[=<table_name>]` (table_name defaults to the base file name)  
 Required directive: `@DATA_TYPE=<Type>`  
