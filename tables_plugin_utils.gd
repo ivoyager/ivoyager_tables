@@ -27,7 +27,7 @@ extends Object
 ##
 ## These functions are copied from a 'master' plugin_utils.gd file containing
 ## all ivoyager plugin utility functions at:
-## [url]https://github.com/ivoyager/ivoyager_core/blob/master/editor_plugin/plugin_utils.gd[/url]
+## [url]https://github.com/ivoyager/ivoyager_core/blob/master/editor/plugin_utils.gd[/url]
 
 
 ## Supply only the base name from the plugin path.
