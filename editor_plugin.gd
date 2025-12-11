@@ -21,9 +21,9 @@
 extends EditorPlugin
 
 # Adds an EditorImportPlugin and autoload singletons as specified by config files
-# 'res://addons/ivoyager_tables/tables.cfg' and 'res://ivoyager_override.cfg'.
+# res://addons/ivoyager_tables/ivoyager_tables.cfg and res://ivoyager_override.cfg.
 #
-# All table data interface is through singleton 'IVTableData' (table_data.gd).
+# All table data interface is through singleton IVTableData (table_data.gd).
 
 
 const plugin_utils := preload("tables_plugin_utils.gd")
@@ -37,7 +37,7 @@ var _autoloads: Dictionary[String, String] = {}
 
 func _enter_tree() -> void:
 	plugin_utils.print_plugin_name_and_version("ivoyager_tables", " - https://ivoyager.dev")
-	_config = plugin_utils.get_ivoyager_config("res://addons/ivoyager_tables/tables.cfg")
+	_config = plugin_utils.get_ivoyager_config("res://addons/ivoyager_tables/ivoyager_tables.cfg")
 	if !_config:
 		return
 	_editor_import_plugin = EditorImportPluginClass.new()
