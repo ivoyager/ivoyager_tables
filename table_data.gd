@@ -19,9 +19,7 @@
 # *****************************************************************************
 extends Node
 
-## Singleton "IVTableData". Provides all interface to data tables.
-##
-## This node is added as singleton "IVTableData".[br][br]
+## Singleton [IVTableData] provides interface to data tables.
 ##
 ## Data dictionaries are populated by calling [method postprocess_tables]. Data
 ## can be accessed directly in data structures or via methods. All dictionaries
