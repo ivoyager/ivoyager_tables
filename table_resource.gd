@@ -65,6 +65,7 @@ const BASE_TYPES: Dictionary[StringName, int] = {
 	&"VECTOR3" : TYPE_VECTOR3,
 	&"VECTOR4" : TYPE_VECTOR4,
 	&"COLOR" : TYPE_COLOR,
+	&"VARIANT" : TYPE_NIL,
 	&"TABLE_ROW" : TYPE_TABLE_ROW,
 }
 
