@@ -2,7 +2,7 @@
 # This file is part of I, Voyager
 # https://ivoyager.dev
 # *****************************************************************************
-# Copyright 2017-2025 Charlie Whitfield
+# Copyright 2019-2026 Charlie Whitfield
 # I, Voyager is a registered trademark of Charlie Whitfield in the US
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,6 +65,7 @@ const BASE_TYPES: Dictionary[StringName, int] = {
 	&"VECTOR3" : TYPE_VECTOR3,
 	&"VECTOR4" : TYPE_VECTOR4,
 	&"COLOR" : TYPE_COLOR,
+	&"VARIANT" : TYPE_NIL,
 	&"TABLE_ROW" : TYPE_TABLE_ROW,
 }
 

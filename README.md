@@ -72,7 +72,7 @@ Spaces are edge-stripped from cells and cell elements ("cell element" refers to 
 
 #### Data Types
 
-Type is specified by column field for "db-style" format or for the whole table for "entity x entity" format. Each data type has a "missing" value that is used if the cell is empty and there is no field or table default value. Default "missing" values are indicated by type below, but these can be respecified. Allowed types are:
+Type is specified by column field for "db-style" format or for the whole table for "entity x entity" format. Each data type has a "missing" value that is used if the cell is empty and there is no field or table default value. Default "missing" values are indicated by type below, but these can be respecified in most cases. Allowed types are:
 
 * `STRING` - Data processing applies Godot escaping such as \n, \t, etc. We also convert unicode "\u" escaping  up to \uFFFF, but not "\U" escaping for larger unicodes. Empty cells will be imputed with default value (if specified) or "".
 * `STRING_NAME` - No escaping. Empty cells will be imputed with default value (if specified) or &"".
@@ -82,6 +82,7 @@ Type is specified by column field for "db-style" format or for the whole table f
 * `COLOR` - Cell content is interpretted in a sensible way. Valid representations of red include: "red", "ff0000", "red, 1.0", "1, 0, 0" and "1, 0, 0, 1". Empty cells will be imputed with default value (if specified) or Color(-INF, -INF, -INF, -INF).
 * `INT` - A valid integer. Empty cells will be imputed with default value (if specified) or -1.
 * `TABLE_ROW` - An entity name as an integer enumeration. The entity name can be from _any_ db-style table included in the `postprocess_tables()` call. E.g., "PLANET_EARTH" in our [planets.tsv](https://github.com/ivoyager/ivoyager_core/blob/master/tables/planets.tsv) would evaluate to 3 because it is row three. Note that table entity names are globally unique (this is enforced). The internal postprocessed data type will be `int`. Empty cells will be imputed with default value (if specified) or -1.
+* `VARIANT` - Cell content is converted using Godot's [str_to_var()](https://docs.godotengine.org/en/stable/classes/class_@globalscope.html#class-globalscope-method-str-to-var) method. Use to specify unsupported field types. It's possible to specify a Dictionary (e.g., `{&"a": 1}`) or even a typed Dictionary (e.g., `Dictionary[StringName, int]({&"a": 1})`). Empty cells will be imputed with default value (if specified) or null. Note: This is the only data "type" where the internal postprocessed field array isn't typed.
 * `<ClassName>.<EnumName>` or `<Class>` - For specifying project or Godot enums. Class and EnumName are needed for project enums (where Class can be the name of a singleton). For Godot classes, EnumName can optionally be omitted. The internal postprocessed data type will be `int`. Empty cells will be imputed with default value (if specified) or -1.
 * `ARRAY[xxxx]` (where "xxxx" specifies element type and is any of the above type strings) - Array elements are expected to be delimited by semicolon (;). After splitting by semicolon, each element is interpreted exactly as its type above. Column `Unit` and `Prefix`, if specified, are applied element-wise. Empty cells will be imputed with default value (if specified) or an empty, typed array.
 

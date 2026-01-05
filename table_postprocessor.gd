@@ -2,7 +2,7 @@
 # This file is part of I, Voyager
 # https://ivoyager.dev
 # *****************************************************************************
-# Copyright 2017-2025 Charlie Whitfield
+# Copyright 2019-2026 Charlie Whitfield
 # I, Voyager is a registered trademark of Charlie Whitfield in the US
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -195,7 +195,6 @@ func _make_read_only_deep_dict(dict: Dictionary) -> void:
 
 
 func _make_read_only_deep_array(array: Array) -> void:
-	assert(array.is_typed()) # all typed here!
 	array.make_read_only()
 	var type := array.get_typed_builtin()
 	if type == TYPE_ARRAY:
@@ -570,6 +569,10 @@ func _get_postprocess_value(import_str: String, preprocess_type: int, prefix: St
 		assert(!prefix, "Prefix not allowed for COLOR")
 		assert(!unit, "Unit not allowed for COLOR")
 		return _get_postprocess_color(import_str)
+	if preprocess_type == TYPE_NIL: # Variant
+		assert(!prefix, "Prefix not allowed for VARIANT")
+		assert(!unit, "Unit not allowed for VARIANT")
+		return str_to_var(import_str)
 	if preprocess_type == TYPE_TABLE_ROW:
 		assert(!unit, "Unit not allowed for TABLE_ROW")
 		return _get_postprocess_table_row(import_str, prefix)
