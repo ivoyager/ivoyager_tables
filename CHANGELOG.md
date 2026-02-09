@@ -4,9 +4,9 @@ This file documents changes to [ivoyager_tables](https://github.com/ivoyager/ivo
 
 File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [v0.1.1] - UNRELEASED
+## [v0.1.1] - 2026-02-09
 
-Under development using Godot 4.5.1. We'll be moving on to 4.6 betas soon! Everything looked ok in a brief test.
+Released using Godot 4.6.
 
 ### Added
 * Added VARIANT as valid field type. Postprocessor converts using Godot's str_to_var(). The postprocessed field array is untyped.
@@ -18,7 +18,7 @@ Under development using Godot 4.5.1. We'll be moving on to 4.6 betas soon! Every
 
 Beta release!
 
-Developed using Godot 4.5.1.
+Released using Godot 4.5.1.
 
 ### Added
 * API for obtaining wiki "page title" dictionaries.
@@ -29,7 +29,7 @@ Developed using Godot 4.5.1.
 
 ## [v0.0.4] - 2025-06-12
 
-Developed using Godot 4.4.1.
+Released using Godot 4.4.1.
 
 ### Added
 * New column type TABLE_ROW to specify entities found in tables.
@@ -44,7 +44,7 @@ Developed using Godot 4.4.1.
 
 ## [v0.0.3] - 2025-03-31
 
-Developed using Godot 4.4.
+Released using Godot 4.4.
 
 ### Added
 * INT column can contain hex ("0x"-prefixed) or binary ("0b"-prefixed) numbers. Underscore ("_") is ignored in both cases.
@@ -55,7 +55,7 @@ Developed using Godot 4.4.
 
 ## [v0.0.2] - 2025-03-20
 
-Developed using Godot 4.4.
+Released using Godot 4.4.
 
 ### Added
 * Added methods `get_db_vector2()`, `get_db_vector4()` and `get_db_array_as_flags()`.
@@ -65,13 +65,13 @@ Developed using Godot 4.4.
 
 ## v0.0.1 - 2025-01-07
 
-Developed using Godot 4.3.
+Released using Godot 4.3.
 
 This plugin resulted from splitting the now-depreciated [Table Importer](https://github.com/ivoyager/ivoyager_table_importer) (v0.0.9) into two plugins: [Tables](https://github.com/ivoyager/ivoyager_tables) (v0.0.1) and [Units](https://github.com/ivoyager/ivoyager_units) (v0.0.1).
 
 v0.0.1 is almost a "drop-in" replacement for ivoyager_table_importer v0.0.9. The main breaking change is in the method signature for postprocess_tables(). The order is changed and you now MUST supply a unit coversion method (you probably want the one in the ivoyager_units plugin).
 
-[v0.1.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.1...HEAD
+[v0.1.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.1...v0.1.1
 [v0.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.0.4...v0.1
 [v0.0.4]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.3...v0.0.4
 [v0.0.3]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.2...v0.0.3
