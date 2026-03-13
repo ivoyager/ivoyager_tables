@@ -284,7 +284,8 @@ func _preprocess_db_style(cells: Array[Array], is_enumeration: bool, is_wiki_onl
 	# handle field names
 	if !is_enumeration:
 		var line_array: Array[String] = cells[0]
-		assert(!line_array[0], "Left-most cell of field name header must be empty in %s, 0" % path)
+		assert(["", "name\\Field", "name", "Field"].has(line_array[0]),
+				"Top-left cell must be empty or contain 'name\\Field', 'name' or 'Field' in %s" % path)
 		column_names = []
 		for column: int in skip_column_0_iterator:
 			var field := StringName(line_array[column])
