@@ -124,7 +124,7 @@ Processed data are structured as a dictionary-of-statically-typed-field-arrays. 
 
 #### Header Rows
 
-The first non-comment, non-directive line is assumed to hold the field names. The left-most cell must be empty.
+The first non-comment, non-directive line is assumed to hold the field names. The left-most cell must be empty or contain the text "name\Field", "name", or "Field".
 
 After field names and before data, tables can have the following header rows in any order:
 * `Type` (required): See data types above.
