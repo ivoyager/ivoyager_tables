@@ -4,6 +4,13 @@ This file documents changes to [ivoyager_tables](https://github.com/ivoyager/ivo
 
 File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.1.2] - UNRELEASED
+
+Under development using Godot 4.6.1.
+
+### Changed
+* Allow text in upper-left cell of DB-style tables
+
 ## [v0.1.1] - 2026-02-09
 
 Released using Godot 4.6.
