@@ -10,6 +10,7 @@ Under development using Godot 4.6.1.
 
 ### Changed
 * Allow text in upper-left cell of DB-style tables
+* Allow data rows with fewer delimiters than header (parsed as empty cells on right). This is standard TSV parser behavior.
 
 ## [v0.1.1] - 2026-02-09
 

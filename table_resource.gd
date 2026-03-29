@@ -138,6 +138,7 @@ func import_file(file: FileAccess, source_path: String) -> void:
 	# store data cells and set table_format
 	var cells: Array[Array] = []
 	var comment_columns: Array[int] = []
+	var n_original_columns: int
 	var n_data_columns: int
 	var file_length := file.get_length()
 	var debug_row := -1
@@ -188,20 +189,22 @@ func import_file(file: FileAccess, source_path: String) -> void:
 				specific_directive_args.append(arg)
 			continue
 		
-		# identify comment columns in 1st non-comment, non-directive row (fields, if we have them)
-		if !cells:
-			n_data_columns = line_array.size()
+		# get column number and identify comment columns
+		if not cells: # this is the header row
+			n_original_columns = line_array.size()
+			n_data_columns = n_original_columns
 			for column in line_array.size():
 				if line_array[column].begins_with("#"):
 					comment_columns.append(column)
 					n_data_columns -= 1
 			comment_columns.reverse() # we'll remove from back
 		
-		# remove comment columns in all rows
+		# resize if needed (for missing right-side delimiters) & remove comment columns
+		assert(line_array.size() <= n_original_columns,
+			"Data row has more columns than header in %s, %s" % [path, debug_row])
+		line_array.resize(n_original_columns)
 		for comment_column in comment_columns: # back to front
 			line_array.remove_at(comment_column)
-		assert(line_array.size() == n_data_columns,
-			"Inconsistent row cell number after delimination in %s, %s" % [path, debug_row])
 		cells.append(line_array)
 	
 	# set format and/or name if not specified in directive
