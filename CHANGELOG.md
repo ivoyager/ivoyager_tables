@@ -6,7 +6,7 @@ File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [v0.1.2] - UNRELEASED
 
-Under development using Godot 4.6.1.
+Under development using Godot 4.6.2.
 
 ### Changed
 * Allow text in upper-left cell of DB-style tables
@@ -79,6 +79,7 @@ This plugin resulted from splitting the now-depreciated [Table Importer](https:/
 
 v0.0.1 is almost a "drop-in" replacement for ivoyager_table_importer v0.0.9. The main breaking change is in the method signature for postprocess_tables(). The order is changed and you now MUST supply a unit coversion method (you probably want the one in the ivoyager_units plugin).
 
+[v0.1.2]: https://github.com/ivoyager/ivoyager_units/compare/v0.1.1...HEAD
 [v0.1.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.1...v0.1.1
 [v0.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.0.4...v0.1
 [v0.0.4]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.3...v0.0.4
