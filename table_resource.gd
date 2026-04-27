@@ -131,6 +131,9 @@ var next_idx := 1
 @export var path: String
 
 
+## Reads [param file] and populates this resource with preprocessed table data.
+## Called by the [code].tsv[/code] [EditorImportPlugin] during import.
+## [param source_path] is used in error messages and stored in [member path].
 func import_file(file: FileAccess, source_path: String) -> void:
 	
 	path = source_path
