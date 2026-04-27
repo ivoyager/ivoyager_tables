@@ -20,6 +20,13 @@
 @tool
 extends EditorImportPlugin
 
+## EditorImportPlugin for I, Voyager [code].tsv[/code] table files.
+##
+## Imports each [code].tsv[/code] file as an [IVTableResource] saved as
+## [code].tres[/code]. The full import pipeline (parsing, postprocessing into
+## the dictionaries exposed via [IVTableData]) runs at simulator start in
+## [IVTablePostprocessor]; this plugin just produces the per-file resource
+## artifact.
 
 
 func _get_importer_name() -> String:

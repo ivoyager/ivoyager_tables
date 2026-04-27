@@ -203,10 +203,15 @@ func postprocess_tables(
 
 
 
+## Returns true if [param page_titles_field] was specified in
+## [param wiki_page_title_fields] for [method postprocess_tables].
 func has_wiki_page_titles(page_titles_field: StringName) -> bool:
 	return wiki_page_titles_by_field.has(page_titles_field)
 
 
+## Returns the wiki page title dictionary keyed by entity name for
+## [param page_titles_field]. The field must have been specified in
+## [param wiki_page_title_fields] for [method postprocess_tables].
 func get_wiki_page_titles(page_titles_field: StringName) -> Dictionary[StringName, String]:
 	assert(wiki_page_titles_by_field.has(page_titles_field),
 			"Wiki page title fields must be specified in method postprocess_tables()")

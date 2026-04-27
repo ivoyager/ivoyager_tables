@@ -20,10 +20,14 @@
 @tool
 extends EditorPlugin
 
-# Adds an EditorImportPlugin and autoload singletons as specified by config files
-# res://addons/ivoyager_tables/ivoyager_tables.cfg and res://ivoyager_override.cfg.
-#
-# All table data interface is through singleton IVTableData (table_data.gd).
+## EditorPlugin that registers the table [code].tsv[/code] importer and autoload
+## singletons for the I, Voyager Tables plugin.
+##
+## Reads autoload entries from
+## [code]res://addons/ivoyager_tables/ivoyager_tables.cfg[/code] (with overrides
+## from [code]res://ivoyager_override.cfg[/code]) and registers them via
+## [method EditorPlugin.add_autoload_singleton]. All table data interface is
+## through singleton [IVTableData].
 
 
 const plugin_utils := preload("tables_plugin_utils.gd")
