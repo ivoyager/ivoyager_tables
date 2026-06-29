@@ -6,12 +6,15 @@ File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [v0.1.2] - UNRELEASED
 
-Under development using Godot 4.6.2.
+Under development using Godot 4.7.
 
 ### Changed
 * Allow text in upper-left cell of DB-style tables
 * Allow data rows with fewer delimiters than header (parsed as empty cells on right). This is standard TSV parser behavior.
 * Completed doc comments in all files.
+
+### Fixed
+* DB_ENTITIES_MOD can now add rows as documented.
 
 ## [v0.1.1] - 2026-02-09
 
