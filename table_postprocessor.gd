@@ -269,6 +269,7 @@ func _postprocess_db_table(table_res: IVTableResource, has_entity_names: bool) -
 	
 	if has_entity_names:
 		table_dict[&"name"] = _enumeration_arrays[table_name]
+		defaults[&"name"] = &""
 	if _enable_precisions:
 		var table_precisions: Dictionary[StringName, Array] = {}
 		_precisions[table_name] = table_precisions

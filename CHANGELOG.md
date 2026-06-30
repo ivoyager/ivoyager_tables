@@ -4,14 +4,17 @@ This file documents changes to [ivoyager_tables](https://github.com/ivoyager/ivo
 
 File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [v0.1.2] - UNRELEASED
+## [v0.1.2] - 2025-06-29
 
-Under development using Godot 4.6.2.
+Released using Godot 4.7.
 
 ### Changed
 * Allow text in upper-left cell of DB-style tables
 * Allow data rows with fewer delimiters than header (parsed as empty cells on right). This is standard TSV parser behavior.
 * Completed doc comments in all files.
+
+### Fixed
+* DB_ENTITIES_MOD can now add rows as documented.
 
 ## [v0.1.1] - 2026-02-09
 
@@ -80,7 +83,7 @@ This plugin resulted from splitting the now-depreciated [Table Importer](https:/
 
 v0.0.1 is almost a "drop-in" replacement for ivoyager_table_importer v0.0.9. The main breaking change is in the method signature for postprocess_tables(). The order is changed and you now MUST supply a unit coversion method (you probably want the one in the ivoyager_units plugin).
 
-[v0.1.2]: https://github.com/ivoyager/ivoyager_units/compare/v0.1.1...HEAD
+[v0.1.2]: https://github.com/ivoyager/ivoyager_units/compare/v0.1.1...v0.1.2
 [v0.1.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.1...v0.1.1
 [v0.1]: https://github.com/ivoyager/ivoyager_units/compare/v0.0.4...v0.1
 [v0.0.4]: https://github.com/ivoyager/ivoyager_tables/compare/v0.0.3...v0.0.4
