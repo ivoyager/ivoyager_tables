@@ -156,8 +156,6 @@ Rules exactly follow DB_ENTITIES except that entity names _must_ be present and 
 
 ## DB_ANONYMOUS Format
 
-[Example Table](https://github.com/ivoyager/ivoyager_core/blob/master/tables/file_adjustments.tsv)
-
 Optional specifier: `@DB_ANONYMOUS[=<table_name>]` (table_name defaults to the base file name)   
 Optional directive: `@DONT_PARSE`
 
