@@ -6,6 +6,8 @@ This plugin works best in combination with our [Units plugin](https://github.com
 
 This plugin was developed for our solar system explorer app [Planetarium](https://www.ivoyager.dev/planetarium/) and related projects.
 
+[REDESIGN_v0.3.md](https://github.com/ivoyager/ivoyager_tables/blob/master/REDESIGN_v0.3.md) is advance notice of the breaking change coming in v0.3: table columns become packed arrays, and read-only protection is dropped. It goes away when v0.3 is released.
+
 ## Installation
 
 Find more detailed instructions at our [Developers Page](https://www.ivoyager.dev/developers/).

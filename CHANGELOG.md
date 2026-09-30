@@ -9,6 +9,9 @@ File format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 Under development using Godot 4.7.2.
 
+### Added
+* [REDESIGN_v0.3.md](REDESIGN_v0.3.md), advance notice of the v0.3 change to packed-array columns, which will break code that reads table data structures directly.
+
 ### Changed
 * Update README.md to not link to a no-longer existing Core table.
 
